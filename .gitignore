@@ -46,3 +46,6 @@ coverage.xml
 
 # Docker volumes
 pgdata/
+
+# Docs
+docs/design-inspiration/
