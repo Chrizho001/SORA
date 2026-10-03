@@ -315,121 +315,121 @@ Files: `apps/accounts/tests/`. Fixtures in `backend/conftest.py`: `api_client`, 
 `unverified_user`, `auth_client` (Bearer), `password` (a known strong password).
 
 ### Group 0 — Scaffold
-- [ ] `pytest` runs against Postgres with `config.settings.test` (smoke test: `assert True`, DB access works)
-- [ ] `AUTH_USER_MODEL == "accounts.User"`
+- [x] `pytest` runs against Postgres with `config.settings.test` (smoke test: `assert True`, DB access works)
+- [x] `AUTH_USER_MODEL == "accounts.User"`
 
 ### Group 1 — User model & manager (`test_models.py`)
-- [ ] `create_user` stores the email lower-cased and trimmed
-- [ ] `create_user` without an email raises `ValueError`
-- [ ] the password is hashed with Argon2 and `check_password` works
-- [ ] new users default to `is_active=True`, `is_email_verified=False`, `is_staff=False`
-- [ ] a duplicate email (different case) raises `IntegrityError`
-- [ ] `create_superuser` sets `is_staff`, `is_superuser`, and `is_email_verified`
-- [ ] `id` is a UUID; `str(user)` returns the email
+- [x] `create_user` stores the email lower-cased and trimmed
+- [x] `create_user` without an email raises `ValueError`
+- [x] the password is hashed with Argon2 and `check_password` works
+- [x] new users default to `is_active=True`, `is_email_verified=False`, `is_staff=False`
+- [x] a duplicate email (different case) raises `IntegrityError`
+- [x] `create_superuser` sets `is_staff`, `is_superuser`, and `is_email_verified`
+- [x] `id` is a UUID; `str(user)` returns the email
 
 ### Group 2 — Register (`test_api_register.py`)
-- [ ] valid payload → 201, `UserSerializer` shape, no `password` in the response
-- [ ] the user is created unverified, with a hashed password
-- [ ] exactly one verification email goes to the user, containing `{FRONTEND_URL}/verify-email?token=`
-- [ ] duplicate email (any case) → 400 with `errors.email`
-- [ ] weak password → 400 with `errors.password`
-- [ ] `password_confirm` mismatch → 400
-- [ ] missing required fields → 400 listing each field
-- [ ] the response follows the error envelope (`detail`, `code="validation_error"`, `errors`)
-- [ ] exceeding `auth_register` rate → 429
+- [x] valid payload → 201, `UserSerializer` shape, no `password` in the response
+- [x] the user is created unverified, with a hashed password
+- [x] exactly one verification email goes to the user, containing `{FRONTEND_URL}/verify-email?token=`
+- [x] duplicate email (any case) → 400 with `errors.email`
+- [x] weak password → 400 with `errors.password`
+- [x] `password_confirm` mismatch → 400
+- [x] missing required fields → 400 listing each field
+- [x] the response follows the error envelope (`detail`, `code="validation_error"`, `errors`)
+- [x] exceeding `auth_register` rate → 429
 
 ### Group 3 — Email verification (`test_api_verify_email.py`)
-- [ ] a valid token → 200, user `is_email_verified=True`
-- [ ] verifying again → 200 (idempotent)
-- [ ] a tampered token → 400 `invalid_token`
-- [ ] an expired token (freezegun, > 24 h) → 400 `token_expired`
-- [ ] a token for a deleted user → 400 `invalid_token`
-- [ ] resend for an unverified user → 200 + email sent
-- [ ] resend for an unknown email / verified user / inactive user → 200 + **no** email (identical body)
+- [x] a valid token → 200, user `is_email_verified=True`
+- [x] verifying again → 200 (idempotent)
+- [x] a tampered token → 400 `invalid_token`
+- [x] an expired token (freezegun, > 24 h) → 400 `token_expired`
+- [x] a token for a deleted user → 400 `invalid_token`
+- [x] resend for an unverified user → 200 + email sent
+- [x] resend for an unknown email / verified user / inactive user → 200 + **no** email (identical body)
 
 ### Group 4 — Login (`test_api_login.py`)
-- [ ] valid credentials → 200 with `access` and `user`
-- [ ] the response sets the refresh cookie: HttpOnly, SameSite=Lax, path `/api/v1/auth/`, max-age 7 d
-- [ ] the `access` token authenticates against `me/`
-- [ ] the email is matched case-insensitively and trimmed
-- [ ] wrong password → 401 `invalid_credentials`
-- [ ] unknown email → 401 `invalid_credentials` (same body as a wrong password)
-- [ ] inactive user → 401 `invalid_credentials`
-- [ ] unverified user with correct password → 403 `email_not_verified`
-- [ ] `last_login` is updated
-- [ ] the 6th attempt within a minute → 429
+- [x] valid credentials → 200 with `access` and `user`
+- [x] the response sets the refresh cookie: HttpOnly, SameSite=Lax, path `/api/v1/auth/`, max-age 7 d
+- [x] the `access` token authenticates against `me/`
+- [x] the email is matched case-insensitively and trimmed
+- [x] wrong password → 401 `invalid_credentials`
+- [x] unknown email → 401 `invalid_credentials` (same body as a wrong password)
+- [x] inactive user → 401 `invalid_credentials`
+- [x] unverified user with correct password → 403 `email_not_verified`
+- [x] `last_login` is updated
+- [x] the 6th attempt within a minute → 429
 
 ### Group 5 — Token refresh (`test_api_refresh.py`)
-- [ ] a valid cookie + header → 200 with a new `access` and a rotated refresh cookie (different value)
-- [ ] the old refresh token is blacklisted after rotation; reusing it → 401 `refresh_invalid`
-- [ ] no cookie → 401 `refresh_missing`
-- [ ] a malformed cookie → 401 `refresh_invalid`, cookie cleared
-- [ ] an expired refresh token (freezegun, > 7 d) → 401
-- [ ] the user deactivated since login → 401
-- [ ] a missing `X-Requested-With` header → 403 `csrf_header_missing`
+- [x] a valid cookie + header → 200 with a new `access` and a rotated refresh cookie (different value)
+- [x] the old refresh token is blacklisted after rotation; reusing it → 401 `refresh_invalid`
+- [x] no cookie → 401 `refresh_missing`
+- [x] a malformed cookie → 401 `refresh_invalid`, cookie cleared
+- [x] an expired refresh token (freezegun, > 7 d) → 401
+- [x] the user deactivated since login → 401
+- [x] a missing `X-Requested-With` header → 403 `csrf_header_missing`
 
 ### Group 6 — Logout (`test_api_logout.py`)
-- [ ] with a valid cookie → 205, the token is blacklisted, the cookie is cleared (max-age 0)
-- [ ] refresh after logout → 401
-- [ ] without a cookie → 205 (idempotent)
-- [ ] a missing header → 403
+- [x] with a valid cookie → 205, the token is blacklisted, the cookie is cleared (max-age 0)
+- [x] refresh after logout → 401
+- [x] without a cookie → 205 (idempotent)
+- [x] a missing header → 403
 
 ### Group 7 — Password reset (`test_api_password_reset.py`)
-- [ ] a known active email → 200 + one email containing `{FRONTEND_URL}/reset-password?uid=…&token=…`
-- [ ] an unknown or inactive email → 200, identical body, no email
-- [ ] confirm with a valid uid/token → 200; the new password works for login; the old one doesn't
-- [ ] confirm marks the email as verified
-- [ ] confirm blacklists the existing refresh tokens
-- [ ] reusing the same token → 400 `invalid_token`
-- [ ] an expired token (> 1 h) → 400 `invalid_token`
-- [ ] a bad uid → 400 `invalid_token`
-- [ ] a weak or mismatched new password → 400 `validation_error`
-- [ ] throttled → 429
+- [x] a known active email → 200 + one email containing `{FRONTEND_URL}/reset-password?uid=…&token=…`
+- [x] an unknown or inactive email → 200, identical body, no email
+- [x] confirm with a valid uid/token → 200; the new password works for login; the old one doesn't
+- [x] confirm marks the email as verified
+- [x] confirm blacklists the existing refresh tokens
+- [x] reusing the same token → 400 `invalid_token`
+- [x] an expired token (> 1 h) → 400 `invalid_token`
+- [x] a bad uid → 400 `invalid_token`
+- [x] a weak or mismatched new password → 400 `validation_error`
+- [x] throttled → 429
 
 ### Group 8 — Profile (`test_api_me.py`)
-- [ ] unauthenticated GET → 401
-- [ ] GET → 200 `UserSerializer` for the requesting user
-- [ ] PATCH names → 200, persisted
-- [ ] PATCH `email` / `is_email_verified` → ignored (unchanged in the DB)
-- [ ] an expired access token (freezegun, > 15 min) → 401
+- [x] unauthenticated GET → 401
+- [x] GET → 200 `UserSerializer` for the requesting user
+- [x] PATCH names → 200, persisted
+- [x] PATCH `email` / `is_email_verified` → ignored (unchanged in the DB)
+- [x] an expired access token (freezegun, > 15 min) → 401
 
 ### Group 9 — Password change (`test_api_password_change.py`)
-- [ ] unauthenticated → 401
-- [ ] wrong `old_password` → 400 `errors.old_password`
-- [ ] weak or mismatched new password → 400
-- [ ] success → 200 with a new `access` + refresh cookie; login works with the new password
-- [ ] refresh tokens issued before the change are blacklisted
-- [ ] a Google-only user (unusable password) → 400 `password_not_set`
+- [x] unauthenticated → 401
+- [x] wrong `old_password` → 400 `errors.old_password`
+- [x] weak or mismatched new password → 400
+- [x] success → 200 with a new `access` + refresh cookie; login works with the new password
+- [x] refresh tokens issued before the change are blacklisted
+- [x] a Google-only user (unusable password) → 400 `password_not_set`
 
 ### Group 10 — Google sign-in (`test_google.py`, `test_api_google_login.py`)
 Fake claims fixture: `{"sub": "1234567890", "email": "ada@gmail.com", "email_verified": True,
 "given_name": "Ada", "family_name": "Lovelace", "iss": "https://accounts.google.com", "aud": GOOGLE_CLIENT_ID}`.
-- [ ] `SocialAccount` model: `(provider, provider_uid)` unique; `(user, provider)` unique; cascades on user delete
-- [ ] `verify_google_id_token` returns the claims when `verify_oauth2_token` succeeds (patched)
-- [ ] `verify_google_id_token` raises `GoogleTokenInvalid` when `verify_oauth2_token` raises `ValueError`
-- [ ] `verify_google_id_token` raises `GoogleTokenInvalid` for a wrong `iss`
-- [ ] `verify_google_id_token` raises `GoogleUnavailable` on a transport error
-- [ ] new Google user → 201, `created: true`, user verified, unusable password, `SocialAccount` created, refresh cookie set, **no** verification email
-- [ ] returning Google user (same `sub`) → 200, `created: false`, no duplicate user or link
-- [ ] existing password user with the same email (any case) → 200, Google linked, `is_email_verified` becomes True, password still works
-- [ ] existing **unverified** password user → linked and now verified
-- [ ] names are not overwritten for an existing user
-- [ ] missing `family_name` → user created with `last_name=""`
-- [ ] `email_verified=false` → 401 `google_email_unverified`, no user created
-- [ ] invalid token → 401 `google_token_invalid`
-- [ ] Google unavailable → 503 `google_unavailable`
-- [ ] inactive linked user → 401 `invalid_credentials`
-- [ ] the email's user already linked to a different Google `sub` → 409 `account_conflict`
-- [ ] missing `credential` → 400
-- [ ] the returned `access` token works on `me/`, and `me/` shows `auth_providers: ["google"]`, `has_password: false`
-- [ ] password login for a Google-only user → 401 `invalid_credentials`
-- [ ] password reset for a Google-only user sends an email; after confirm, `has_password` is true and password login works
-- [ ] email/password register with a Google user's email → 400 duplicate
-- [ ] throttled → 429
+- [x] `SocialAccount` model: `(provider, provider_uid)` unique; `(user, provider)` unique; cascades on user delete
+- [x] `verify_google_id_token` returns the claims when `verify_oauth2_token` succeeds (patched)
+- [x] `verify_google_id_token` raises `GoogleTokenInvalid` when `verify_oauth2_token` raises `ValueError`
+- [x] `verify_google_id_token` raises `GoogleTokenInvalid` for a wrong `iss`
+- [x] `verify_google_id_token` raises `GoogleUnavailable` on a transport error
+- [x] new Google user → 201, `created: true`, user verified, unusable password, `SocialAccount` created, refresh cookie set, **no** verification email
+- [x] returning Google user (same `sub`) → 200, `created: false`, no duplicate user or link
+- [x] existing password user with the same email (any case) → 200, Google linked, `is_email_verified` becomes True, password still works
+- [x] existing **unverified** password user → linked and now verified
+- [x] names are not overwritten for an existing user
+- [x] missing `family_name` → user created with `last_name=""`
+- [x] `email_verified=false` → 401 `google_email_unverified`, no user created
+- [x] invalid token → 401 `google_token_invalid`
+- [x] Google unavailable → 503 `google_unavailable`
+- [x] inactive linked user → 401 `invalid_credentials`
+- [x] the email's user already linked to a different Google `sub` → 409 `account_conflict`
+- [x] missing `credential` → 400
+- [x] the returned `access` token works on `me/`, and `me/` shows `auth_providers: ["google"]`, `has_password: false`
+- [x] password login for a Google-only user → 401 `invalid_credentials`
+- [x] password reset for a Google-only user sends an email; after confirm, `has_password` is true and password login works
+- [x] email/password register with a Google user's email → 400 duplicate
+- [x] throttled → 429
 
 ### Group 11 — Cross-cutting
-- [ ] the exception handler produces the envelope for 401/403/404/429 as well as 400
-- [ ] the CORS preflight from `FRONTEND_URL` is allowed with credentials; another origin is not allowed
+- [x] the exception handler produces the envelope for 401/403/404/429 as well as 400
+- [x] the CORS preflight from `FRONTEND_URL` is allowed with credentials; another origin is not allowed
 
 ## 8. Out of scope (v1)
 - Social providers other than Google (the `SocialAccount` model allows adding them later).
