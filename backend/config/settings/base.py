@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     # Local
     "apps.accounts",
     "apps.tasks",
+    "apps.documents",
 ]
 
 # ──────────────────────────────────────────────

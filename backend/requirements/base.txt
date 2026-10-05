@@ -14,3 +14,10 @@ argon2-cffi>=23.1,<24.0
 # Google sign-in (server-side ID-token verification)
 google-auth>=2.29,<3.0
 requests>=2.31,<3.0
+
+# Async Tasks
+celery[redis]>=5.4,<6.0
+redis>=5.0,<6.0
+
+# Document Processing
+pypdf>=4.2,<5.0
