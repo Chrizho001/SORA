@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.tasks",
     "apps.documents",
+    "apps.flashcards",
 ]
 
 # ──────────────────────────────────────────────

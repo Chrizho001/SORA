@@ -9,6 +9,12 @@ class Document(models.Model):
         DONE = "DONE", "Done"
         FAILED = "FAILED", "Failed"
 
+    class FlashcardGenerationStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        GENERATING = "GENERATING", "Generating"
+        DONE = "DONE", "Done"
+        FAILED = "FAILED", "Failed"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="documents")
     file = models.FileField(upload_to="documents/%Y/%m/")
@@ -17,6 +23,11 @@ class Document(models.Model):
     page_count = models.IntegerField(null=True, blank=True)
     extracted_text = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPLOADED)
+    flashcard_generation_status = models.CharField(
+        max_length=20, 
+        choices=FlashcardGenerationStatus.choices, 
+        default=FlashcardGenerationStatus.PENDING
+    )
     error_message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

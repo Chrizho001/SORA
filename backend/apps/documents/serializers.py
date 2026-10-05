@@ -19,6 +19,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "size",
             "page_count",
             "status",
+            "flashcard_generation_status",
             "error_message",
             "created_at",
             "updated_at",
@@ -30,6 +31,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "size",
             "page_count",
             "status",
+            "flashcard_generation_status",
             "error_message",
             "created_at",
             "updated_at",
@@ -41,8 +43,8 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ["id", "file", "original_name", "size", "status", "created_at"]
-        read_only_fields = ["id", "original_name", "size", "status", "created_at"]
+        fields = ["id", "file", "original_name", "size", "status", "flashcard_generation_status", "created_at"]
+        read_only_fields = ["id", "original_name", "size", "status", "flashcard_generation_status", "created_at"]
 
     def validate_file(self, value):
         if value.content_type != "application/pdf":
