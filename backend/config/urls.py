@@ -14,4 +14,5 @@ urlpatterns = [
     path("api/v1/tasks/", include("apps.tasks.urls", namespace="tasks")),
     path("api/v1/documents/", include("apps.documents.urls", namespace="documents")),
     path("api/v1/flashcards/", include("apps.flashcards.urls", namespace="flashcards")),
+    path("api/v1/quiz-sessions/", include("apps.quizzes.urls", namespace="quizzes")),
 ]

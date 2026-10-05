@@ -49,3 +49,45 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         return Response({"status": "Generating flashcards..."}, status=status.HTTP_202_ACCEPTED)
 
+    @action(detail=True, methods=["post"], url_path="start-quiz")
+    def start_quiz(self, request, pk=None):
+        document = self.get_object()
+        
+        from apps.flashcards.models import Flashcard
+        flashcards = list(Flashcard.objects.filter(document=document))
+        if len(flashcards) < 4:
+            return Response(
+                {"error": "Document must have at least 4 flashcards to start a quiz."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        import random
+        from apps.quizzes.models import QuizSession, QuizQuestion
+        
+        session = QuizSession.objects.create(
+            user=request.user,
+            document=document,
+            total_questions=len(flashcards)
+        )
+
+        questions = []
+        for fc in flashcards:
+            distractors = [f.answer for f in flashcards if f.id != fc.id]
+            random.shuffle(distractors)
+            distractors = distractors[:3]
+            
+            choices = distractors + [fc.answer]
+            random.shuffle(choices)
+            
+            questions.append(QuizQuestion(
+                session=session,
+                flashcard=fc,
+                choices=choices
+            ))
+            
+        QuizQuestion.objects.bulk_create(questions)
+        
+        from apps.quizzes.serializers import QuizSessionSerializer
+        serializer = QuizSessionSerializer(session)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
