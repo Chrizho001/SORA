@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from apps.documents.models import Document
 from apps.documents.tasks import process_document
+from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 
@@ -12,11 +13,12 @@ def document(user):
 
 
 @pytest.mark.django_db
+@patch("apps.notifications.notification_service.NotificationService.notify")
 class TestProcessDocumentTask:
     
     @patch("apps.documents.tasks.SummarizerClient.summarize")
     @patch("apps.documents.tasks.pypdf.PdfReader")
-    def test_task_success(self, mock_pdf_reader, mock_summarize, document):
+    def test_task_success(self, mock_pdf_reader, mock_summarize, mock_notify, document):
         # Mock PDF
         mock_pdf = MagicMock()
         mock_pdf.is_encrypted = False
@@ -40,7 +42,7 @@ class TestProcessDocumentTask:
         assert document.summary.content == "This is the AI summary."
 
     @patch("apps.documents.tasks.pypdf.PdfReader")
-    def test_task_fails_if_encrypted(self, mock_pdf_reader, document):
+    def test_task_fails_if_encrypted(self, mock_pdf_reader, mock_notify, document):
         # Mock PDF
         mock_pdf = MagicMock()
         mock_pdf.is_encrypted = True
@@ -55,7 +57,7 @@ class TestProcessDocumentTask:
         assert "encrypted" in document.error_message
 
     @patch("apps.documents.tasks.pypdf.PdfReader")
-    def test_task_fails_if_no_text_extracted(self, mock_pdf_reader, document):
+    def test_task_fails_if_no_text_extracted(self, mock_pdf_reader, mock_notify, document):
         # Mock PDF
         mock_pdf = MagicMock()
         mock_pdf.is_encrypted = False
@@ -74,7 +76,7 @@ class TestProcessDocumentTask:
 
     @patch("apps.documents.tasks.SummarizerClient.summarize")
     @patch("apps.documents.tasks.pypdf.PdfReader")
-    def test_task_fails_if_ai_raises_exception(self, mock_pdf_reader, mock_summarize, document):
+    def test_task_fails_if_ai_raises_exception(self, mock_pdf_reader, mock_summarize, mock_notify, document):
         # Mock PDF
         mock_pdf = MagicMock()
         mock_pdf.is_encrypted = False

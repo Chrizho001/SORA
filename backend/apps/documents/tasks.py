@@ -52,8 +52,28 @@ def process_document(document_id: str):
             )
             document.status = Document.Status.DONE
             document.save(update_fields=["status"])
+            
+        from apps.notifications.notification_service import NotificationService
+        from apps.notifications.models import NotificationType
+        NotificationService.notify(
+            recipient=document.user,
+            notification_type=NotificationType.PDF_SUMMARY_READY,
+            title="Summary Ready",
+            body=f"Your summary for '{document.original_name}' is ready.",
+            data={"document_id": str(document.id)}
+        )
 
     except Exception as e:
         document.status = Document.Status.FAILED
         document.error_message = str(e)
         document.save(update_fields=["status", "error_message"])
+        
+        from apps.notifications.notification_service import NotificationService
+        from apps.notifications.models import NotificationType
+        NotificationService.notify(
+            recipient=document.user,
+            notification_type=NotificationType.PDF_SUMMARY_FAILED,
+            title="Summary Failed",
+            body=f"Failed to process '{document.original_name}'.",
+            data={"document_id": str(document.id)}
+        )

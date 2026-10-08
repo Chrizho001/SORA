@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "apps.documents",
     "apps.flashcards",
     "apps.quizzes",
+    "apps.notifications",
 ]
 
 # ──────────────────────────────────────────────

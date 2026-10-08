@@ -15,10 +15,11 @@ def summary(document):
     return Summary.objects.create(document=document, content="This is a summary", ai_model_used="test")
 
 @pytest.mark.django_db
+@patch("apps.notifications.notification_service.NotificationService.notify")
 class TestGenerateFlashcardsTask:
     
     @patch("apps.flashcards.tasks.FlashcardGeneratorClient.generate")
-    def test_task_success(self, mock_generate, document, summary):
+    def test_task_success(self, mock_generate, mock_notify, document, summary):
         mock_generate.return_value = [
             {"question": "Q1?", "answer": "A1."},
             {"question": "Q2?", "answer": "A2."}
@@ -35,7 +36,7 @@ class TestGenerateFlashcardsTask:
         assert cards[1].question == "Q2?"
 
     @patch("apps.flashcards.tasks.FlashcardGeneratorClient.generate")
-    def test_task_fails_on_ai_error(self, mock_generate, document, summary):
+    def test_task_fails_on_ai_error(self, mock_generate, mock_notify, document, summary):
         mock_generate.side_effect = Exception("AI failure")
 
         generate_flashcards_task(str(document.id))

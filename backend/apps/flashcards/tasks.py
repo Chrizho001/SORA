@@ -47,6 +47,16 @@ def generate_flashcards_task(document_id: str):
 
             document.flashcard_generation_status = Document.FlashcardGenerationStatus.DONE
             document.save(update_fields=["flashcard_generation_status"])
+            
+        from apps.notifications.notification_service import NotificationService
+        from apps.notifications.models import NotificationType
+        NotificationService.notify(
+            recipient=document.user,
+            notification_type=NotificationType.FLASHCARDS_READY,
+            title="Flashcards Ready",
+            body=f"{len(flashcards)} flashcards have been generated for '{document.original_name}'.",
+            data={"document_id": str(document.id)}
+        )
 
     except Exception as e:
         document.flashcard_generation_status = Document.FlashcardGenerationStatus.FAILED

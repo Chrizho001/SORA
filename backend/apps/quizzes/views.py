@@ -48,5 +48,20 @@ class QuizSessionViewSet(
         session.finished_at = timezone.now()
         session.save(update_fields=["score", "finished_at"])
 
+        try:
+            from apps.notifications.notification_service import NotificationService
+            from apps.notifications.models import NotificationType
+            NotificationService.notify(
+                recipient=request.user,
+                notification_type=NotificationType.QUIZ_GRADED,
+                title="Quiz Graded",
+                body=f"You scored {score}/{session.total_questions} on the quiz for '{session.document.original_name}'.",
+                data={"quiz_session_id": str(session.id)}
+            )
+        except Exception as e:
+            # Continue even if notification fails
+            import logging
+            logging.getLogger(__name__).error(f"Failed to notify: {e}")
+
         serializer = self.get_serializer(session)
         return Response(serializer.data, status=status.HTTP_200_OK)
