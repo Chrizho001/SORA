@@ -21,3 +21,14 @@ class TaskSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
         return Task.objects.create(user=user, **validated_data)
+
+class TaskQuerySerializer(serializers.Serializer):
+    is_completed = serializers.BooleanField(required=False)
+    priority = serializers.ChoiceField(choices=Task.Priority.choices, required=False)
+    date = serializers.DateField(required=False)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["from"] = serializers.DateTimeField(required=False)
+        fields["to"] = serializers.DateTimeField(required=False)
+        return fields

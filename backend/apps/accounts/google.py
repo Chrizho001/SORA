@@ -16,12 +16,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-class GoogleTokenInvalid(Exception):
-    """Raised when the Google ID token fails verification (bad signature, aud, iss, exp)."""
-
-
-class GoogleUnavailable(Exception):
-    """Raised when Google's public keys cannot be fetched (network error)."""
+from .exceptions import GoogleTokenInvalid, GoogleUnavailable
 
 
 def verify_google_id_token(credential: str) -> dict:

@@ -12,27 +12,24 @@ class TaskViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Task.objects.filter(user=self.request.user)
         
-        is_completed = self.request.query_params.get("is_completed")
-        if is_completed is not None:
-            if is_completed.lower() == "true":
-                qs = qs.filter(is_completed=True)
-            elif is_completed.lower() == "false":
-                qs = qs.filter(is_completed=False)
+        from apps.tasks.serializers import TaskQuerySerializer
+        serializer = TaskQuerySerializer(data=self.request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        
+        if "is_completed" in self.request.query_params and "is_completed" in validated:
+            qs = qs.filter(is_completed=validated["is_completed"])
                 
-        priority = self.request.query_params.get("priority")
-        if priority:
-            qs = qs.filter(priority=priority)
+        if "priority" in validated:
+            qs = qs.filter(priority=validated["priority"])
             
-        date = self.request.query_params.get("date")
-        if date:
-            qs = qs.filter(due_at__date=date)
+        if "date" in validated:
+            qs = qs.filter(due_at__date=validated["date"])
             
-        from_date = self.request.query_params.get("from")
-        if from_date:
-            qs = qs.filter(due_at__gte=from_date)
+        if "from" in validated:
+            qs = qs.filter(due_at__gte=validated["from"])
             
-        to_date = self.request.query_params.get("to")
-        if to_date:
-            qs = qs.filter(due_at__lte=to_date)
+        if "to" in validated:
+            qs = qs.filter(due_at__lte=validated["to"])
             
         return qs.order_by(F("due_at").asc(nulls_last=True), "-priority")

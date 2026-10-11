@@ -25,7 +25,9 @@ class QuizSession(models.Model):
 class QuizQuestion(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey(QuizSession, on_delete=models.CASCADE, related_name="questions")
-    flashcard = models.ForeignKey(Flashcard, on_delete=models.CASCADE)
+    flashcard = models.ForeignKey(Flashcard, null=True, on_delete=models.SET_NULL)
+    question_text = models.TextField(default="")
+    correct_answer = models.TextField(default="")
     choices = models.JSONField()
     selected_choice = models.TextField(blank=True, null=True)
     is_correct = models.BooleanField(null=True, blank=True)

@@ -2,6 +2,8 @@
 
 Final-year project. A study assistant that helps students manage tasks, summarise PDFs, and study with flashcards and quizzes.
 
+Read `PROJECT_GOAL.md` first; open review findings are in `docs/reviews/`.
+
 ## Platform (read first)
 This is a **Progressive Web App (PWA)**, not a native mobile app. It is an installable, mobile-first,
 responsive web app (Next.js) talking to a Django REST API. `Study_Assistant_SRS.md` (v1.1) is the

@@ -1,6 +1,7 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
 from django.utils import timezone
 
 
@@ -11,13 +12,16 @@ class Task(models.Model):
         HIGH = 3, "High"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tasks")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tasks"
+    )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     due_at = models.DateTimeField(null=True, blank=True)
     priority = models.IntegerField(choices=Priority.choices, default=Priority.MEDIUM)
     is_completed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

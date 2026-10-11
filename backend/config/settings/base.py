@@ -79,7 +79,7 @@ MIDDLEWARE = [
 # Database — PostgreSQL via psycopg 3
 # ──────────────────────────────────────────────
 DATABASES = {
-    "default": env.db("DATABASE_URL", default="postgres://study_user:study_pass@localhost:5432/study_assistant"),
+    "default": env.db("DATABASE_URL"),
 }
 
 # ──────────────────────────────────────────────
@@ -99,7 +99,10 @@ PASSWORD_HASHERS = [
 # Password validators (01-authentication.md §6)
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 8},
+    },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -127,8 +130,17 @@ REST_FRAMEWORK = {
         "auth_register": "10/hour",
         "auth_email": "5/hour",
         "auth_password": "5/min",
+        "ai_jobs": "20/day",
     },
     "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=0),
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/1"),
+    }
 }
 
 # ──────────────────────────────────────────────
@@ -264,3 +276,46 @@ LOGGING = {
         },
     },
 }
+
+# ──────────────────────────────────────────────
+# Celery
+# ──────────────────────────────────────────────
+CELERY_BROKER_URL = env("REDIS_URL", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = None
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_TIME_LIMIT = 300
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+CELERY_BEAT_SCHEDULE = {
+    "task-due-reminders": {
+        "task": "apps.notifications.tasks.send_due_task_reminders",
+        "schedule": 900,
+    },
+    "flush-expired-tokens": {
+        "task": "apps.accounts.tasks.flush_expired_tokens",
+        "schedule": 86400,
+    },
+}
+
+# ──────────────────────────────────────────────
+# Push Notifications (VAPID)
+# ──────────────────────────────────────────────
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", default="")
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", default="")
+VAPID_CLAIM_EMAIL = env("VAPID_CLAIM_EMAIL", default="")
+
+# ──────────────────────────────────────────────
+# AI API
+# ──────────────────────────────────────────────
+AI_PROVIDER = env("AI_PROVIDER", default="mock")
+AI_API_KEY = env("AI_API_KEY", default="")
+
+# ──────────────────────────────────────────────
+# Media (Uploads)
+# ──────────────────────────────────────────────
+MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
+
+# ──────────────────────────────────────────────
+# Documents
+# ──────────────────────────────────────────────
+DOCUMENT_MAX_PAGES = env.int("DOCUMENT_MAX_PAGES", default=50)
+DOCUMENT_MAX_CHARS = env.int("DOCUMENT_MAX_CHARS", default=100000)

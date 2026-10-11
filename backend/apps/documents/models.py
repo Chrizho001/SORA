@@ -1,6 +1,8 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
+
 
 class Document(models.Model):
     class Status(models.TextChoices):
@@ -10,13 +12,15 @@ class Document(models.Model):
         FAILED = "FAILED", "Failed"
 
     class FlashcardGenerationStatus(models.TextChoices):
-        PENDING = "PENDING", "Pending"
+        NOT_STARTED = "NOT_STARTED", "Not Started"
         GENERATING = "GENERATING", "Generating"
         DONE = "DONE", "Done"
         FAILED = "FAILED", "Failed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="documents")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="documents"
+    )
     file = models.FileField(upload_to="documents/%Y/%m/")
     original_name = models.CharField(max_length=255)
     size = models.IntegerField()
@@ -24,11 +28,13 @@ class Document(models.Model):
     extracted_text = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPLOADED)
     flashcard_generation_status = models.CharField(
-        max_length=20, 
-        choices=FlashcardGenerationStatus.choices, 
-        default=FlashcardGenerationStatus.PENDING
+        max_length=20,
+        choices=FlashcardGenerationStatus.choices,
+        default=FlashcardGenerationStatus.NOT_STARTED,
     )
+    flashcard_generation_started_at = models.DateTimeField(null=True, blank=True)
     error_message = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

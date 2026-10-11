@@ -53,12 +53,27 @@ class TestPushSubscriptionAPI:
     def test_create_subscription(self, auth_client, user):
         url = reverse("notifications:pushsubscription-list")
         res = auth_client.post(url, {
-            "endpoint": "https://test.com/push",
+            "endpoint": "https://fcm.googleapis.com/fcm/send/fake",
             "p256dh": "p256dh_key",
             "auth": "auth_key"
         })
         assert res.status_code == status.HTTP_201_CREATED
         assert PushSubscription.objects.filter(user=user).count() == 1
+
+    @pytest.mark.parametrize("endpoint", [
+        "http://fcm.googleapis.com/test",
+        "https://169.254.169.254/latest/meta-data/",
+        "https://evil.com/push",
+    ])
+    def test_create_subscription_rejects_ssrf_endpoints(self, auth_client, user, endpoint):
+        url = reverse("notifications:pushsubscription-list")
+        res = auth_client.post(url, {
+            "endpoint": endpoint,
+            "p256dh": "p256dh_key",
+            "auth": "auth_key"
+        })
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert "endpoint" in res.data or "endpoint" in getattr(res, 'data', {}).get("errors", {})
 
 @pytest.mark.django_db
 class TestNotificationPreferenceAPI:

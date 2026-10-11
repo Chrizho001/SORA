@@ -54,15 +54,14 @@ class NotificationPreferenceViewSet(
 
     @action(detail=False, methods=["patch"], url_path="update")
     def update_preference(self, request):
-        notification_type = request.data.get("notification_type")
-        if not notification_type:
-            return Response({"error": "notification_type is required"}, status=status.HTTP_400_BAD_REQUEST)
-            
-        pref, created = NotificationPreference.objects.get_or_create(
-            user=request.user, notification_type=notification_type
-        )
-        
-        serializer = self.get_serializer(pref, data=request.data, partial=True)
+        serializer = self.get_serializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        notification_type = serializer.validated_data.get("notification_type")
+        if not notification_type:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"notification_type": ["This field is required."]}, code="invalid")
+            
+        pref, created = NotificationPreference.objects.update_or_create(
+            user=request.user, notification_type=notification_type, defaults=serializer.validated_data
+        )
+        return Response(self.get_serializer(pref).data)

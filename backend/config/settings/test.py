@@ -20,3 +20,14 @@ AUTH_COOKIE_SECURE = False
 LOGGING["loggers"]["apps"]["level"] = "WARNING"  # noqa: F405
 LOGGING["loggers"]["django"]["level"] = "WARNING"  # noqa: F405
 LOGGING["root"]["level"] = "WARNING"  # noqa: F405
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
+
+# Celery eager execution in tests (NEW-9)
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BROKER_URL = "memory://"

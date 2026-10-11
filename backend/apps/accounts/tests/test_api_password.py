@@ -86,3 +86,24 @@ class TestChangePasswordAPI:
         response = api_client.post(self.url, payload, format="json")
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_password_change_invalidates_all_refresh_tokens(self, api_client, user, password):
+        from django.conf import settings
+        refresh = RefreshToken.for_user(user)
+        
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        payload = {
+            "old_password": password,
+            "password": "New!Password123",
+            "password_confirm": "New!Password123",
+        }
+        api_client.post(self.url, payload, format="json")
+        
+        # Try to use old refresh token
+        refresh_url = reverse("accounts:token-refresh")
+        api_client.credentials() # clear access token
+        api_client.cookies[settings.AUTH_REFRESH_COOKIE_NAME] = str(refresh)
+        
+        response = api_client.post(refresh_url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+

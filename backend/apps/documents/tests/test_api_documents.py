@@ -19,8 +19,9 @@ def valid_pdf():
 
 @pytest.fixture
 def large_pdf():
-    # 11MB file
-    return SimpleUploadedFile("large.pdf", b"0" * (11 * 1024 * 1024), content_type="application/pdf")
+    # 11MB file with valid header
+    content = b"%PDF-1.4\n" + b"0" * (11 * 1024 * 1024)
+    return SimpleUploadedFile("large.pdf", content, content_type="application/pdf")
 
 @pytest.fixture
 def text_file():
@@ -54,6 +55,12 @@ class TestDocumentAPI:
         res = auth_client.post(self.url, {"file": large_pdf}, format="multipart")
         assert res.status_code == status.HTTP_400_BAD_REQUEST
         assert "File size cannot exceed 10MB." in res.data["errors"]["file"]
+
+    def test_upload_fake_pdf_fails(self, auth_client):
+        fake_pdf = SimpleUploadedFile("fake.pdf", b"this is not a pdf file", content_type="application/pdf")
+        res = auth_client.post(self.url, {"file": fake_pdf}, format="multipart")
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Only PDF files are allowed." in res.data["errors"]["file"]
 
     def test_list_documents(self, auth_client, user):
         doc1 = Document.objects.create(user=user, original_name="test1.pdf", size=100)

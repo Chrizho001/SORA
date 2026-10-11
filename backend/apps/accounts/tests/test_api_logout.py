@@ -60,3 +60,28 @@ class TestLogoutAPI:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert response.data["code"] == "csrf_header_missing"
+
+    def test_logout_with_push_endpoint_revokes_subscription(self, api_client, user):
+        from apps.notifications.models import PushSubscription
+
+        endpoint = "https://fcm.googleapis.com/fcm/send/device123"
+        sub = PushSubscription.objects.create(
+            user=user,
+            endpoint=endpoint,
+            p256dh="key",
+            auth="auth",
+        )
+        refresh = RefreshToken.for_user(user)
+        cookie_name = settings.AUTH_REFRESH_COOKIE_NAME
+        api_client.cookies[cookie_name] = str(refresh)
+
+        response = api_client.post(
+            self.url,
+            {"push_endpoint": endpoint},
+            format="json",
+            **self.get_headers(),
+        )
+        assert response.status_code == status.HTTP_205_RESET_CONTENT
+
+        sub.refresh_from_db()
+        assert sub.revoked_at is not None

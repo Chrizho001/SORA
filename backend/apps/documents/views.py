@@ -1,11 +1,11 @@
-from rest_framework import viewsets, status
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer, DocumentUploadSerializer
 
-
-from rest_framework.decorators import action
 
 class DocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -18,6 +18,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return DocumentUploadSerializer
         return DocumentSerializer
 
+    def get_throttles(self):
+        if self.action in ["create", "generate_flashcards"]:
+            self.throttle_scope = "ai_jobs"
+        return super().get_throttles()
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -25,69 +30,77 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         # Queue celery task
         from apps.documents.tasks import process_document
+
         process_document.delay(str(document.id))
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED, headers=headers)
 
+    def perform_destroy(self, instance):
+        from django.db import transaction
+
+        file = instance.file
+        instance.delete()
+        if file:
+            transaction.on_commit(lambda: file.delete(save=False))
+
     @action(detail=True, methods=["post"], url_path="generate-flashcards")
     def generate_flashcards(self, request, pk=None):
         document = self.get_object()
-        
+
         if document.status != Document.Status.DONE:
-            return Response(
-                {"error": "Document summary must be completed before generating flashcards."},
-                status=status.HTTP_400_BAD_REQUEST
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(
+                {"document": ["Document summary must be completed before generating flashcards."]},
+                code="summary_not_ready",
+            )
+
+        from datetime import timedelta
+
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from apps.accounts.exceptions import ConflictError
+
+        now = timezone.now()
+        stale_threshold = now - timedelta(minutes=10)
+
+        claim_filter = Q(pk=document.pk) & (
+            ~Q(flashcard_generation_status=Document.FlashcardGenerationStatus.GENERATING)
+            | Q(flashcard_generation_started_at__lt=stale_threshold)
+        )
+        claimed = Document.objects.filter(claim_filter).update(
+            flashcard_generation_status=Document.FlashcardGenerationStatus.GENERATING,
+            flashcard_generation_started_at=now,
+        )
+
+        if not claimed:
+            raise ConflictError(
+                "Flashcards are already being generated.", code="generation_in_progress"
             )
 
         # Queue celery task
         from apps.flashcards.tasks import generate_flashcards_task
-        generate_flashcards_task.delay(str(document.id))
 
-        document.flashcard_generation_status = Document.FlashcardGenerationStatus.PENDING
-        document.save(update_fields=["flashcard_generation_status"])
+        try:
+            generate_flashcards_task.delay(str(document.id))
+        except Exception:
+            Document.objects.filter(pk=document.pk).update(
+                flashcard_generation_status=Document.FlashcardGenerationStatus.FAILED,
+                flashcard_generation_started_at=None,
+            )
+            raise
 
         return Response({"status": "Generating flashcards..."}, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["post"], url_path="start-quiz")
     def start_quiz(self, request, pk=None):
         document = self.get_object()
-        
-        from apps.flashcards.models import Flashcard
-        flashcards = list(Flashcard.objects.filter(document=document))
-        if len(flashcards) < 4:
-            return Response(
-                {"error": "Document must have at least 4 flashcards to start a quiz."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
-        import random
-        from apps.quizzes.models import QuizSession, QuizQuestion
-        
-        session = QuizSession.objects.create(
-            user=request.user,
-            document=document,
-            total_questions=len(flashcards)
-        )
-
-        questions = []
-        for fc in flashcards:
-            distractors = [f.answer for f in flashcards if f.id != fc.id]
-            random.shuffle(distractors)
-            distractors = distractors[:3]
-            
-            choices = distractors + [fc.answer]
-            random.shuffle(choices)
-            
-            questions.append(QuizQuestion(
-                session=session,
-                flashcard=fc,
-                choices=choices
-            ))
-            
-        QuizQuestion.objects.bulk_create(questions)
-        
         from apps.quizzes.serializers import QuizSessionSerializer
+        from apps.quizzes.services import start_quiz
+
+        session = start_quiz(user=request.user, document=document)
         serializer = QuizSessionSerializer(session)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-

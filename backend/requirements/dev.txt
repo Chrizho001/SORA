@@ -9,3 +9,7 @@ freezegun>=1.4,<2.0
 
 # Lint & format
 ruff>=0.4,<1.0
+
+# Security audit
+pip-audit>=2.7,<3.0
+

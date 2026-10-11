@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.core.signing import dumps
 from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -51,7 +52,8 @@ def send_verification_email(user: User) -> None:
     subject = "Verify your email - Study Assistant"
     message = (
         f"Hi {user.first_name},\n\n"
-        "Welcome to Study Assistant! Please verify your email address by clicking the link below:\n\n"
+        "Welcome to Study Assistant! Please verify your email address "
+        "by clicking the link below:\n\n"
         f"{verification_url}\n\n"
         "If you did not sign up for this account, you can safely ignore this email."
     )
@@ -125,22 +127,64 @@ def authenticate_user(email: str, password: str) -> User:
     """
     from django.contrib.auth import authenticate
 
+    from .exceptions import EmailNotVerified, InvalidCredentials
+
     email = email.strip().lower()
     user = authenticate(email=email, password=password)
 
     if user is None:
-        logger.warning("Failed login attempt for email: %s", email)
-        raise ValueError("invalid_credentials")
+        logger.warning("Failed login attempt (invalid credentials)")
+        raise InvalidCredentials("invalid_credentials")
 
     if not user.is_active:
-        logger.warning("Login attempt for inactive user: %s", email)
-        raise ValueError("invalid_credentials")
+        logger.warning("Login attempt for inactive user_id=%s", user.id)
+        raise InvalidCredentials("invalid_credentials")
 
     if not user.is_email_verified:
-        logger.warning("Login attempt for unverified user: %s", email)
-        raise ValueError("email_not_verified")
+        logger.warning("Login attempt for unverified user_id=%s", user.id)
+        raise EmailNotVerified("email_not_verified")
 
     return user
+
+
+def issue_login_tokens(user: User):
+    """
+    Issue JWT tokens for a logged in user, update last_login,
+    and emit a single SECURITY_NEW_LOGIN notification.
+    """
+    import time
+
+    from django.contrib.auth.models import update_last_login
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    from apps.notifications.models import NotificationType
+    from apps.notifications.notification_service import NotificationService
+
+    update_last_login(None, user)
+    refresh = RefreshToken.for_user(user)
+    refresh["auth_time"] = int(time.time())
+
+    try:
+        NotificationService.notify(
+            recipient=user,
+            notification_type=NotificationType.SECURITY_NEW_LOGIN,
+            title="New Login Detected",
+            body="A new login was detected for your account.",
+            data={},
+        )
+    except Exception as e:
+        logger.error("Failed to notify login: %s", e)
+
+    return refresh
+
+
+def revoke_all_refresh_tokens(user) -> None:
+    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+    tokens = OutstandingToken.objects.filter(user=user, blacklistedtoken__isnull=True)
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token=t) for t in tokens], ignore_conflicts=True
+    )
 
 
 def change_password(user: User, new_password: str) -> None:
@@ -149,10 +193,25 @@ def change_password(user: User, new_password: str) -> None:
     """
     from django.contrib.auth.models import update_last_login
 
-    user.set_password(new_password)
-    user.save(update_fields=["password", "updated_at"])
-    update_last_login(None, user)
+    with transaction.atomic():
+        user.set_password(new_password)
+        user.save(update_fields=["password", "updated_at"])
+        update_last_login(None, user)
+        revoke_all_refresh_tokens(user)
     logger.info("Password changed for user_id=%s", user.id)
+    from apps.notifications.models import NotificationType
+    from apps.notifications.notification_service import NotificationService
+
+    NotificationService.notify(
+        recipient=user,
+        notification_type=NotificationType.SECURITY_PASSWORD_CHANGED,
+        title="Password Changed",
+        body=(
+            "Your password has been changed. "
+            "If this was not you, please contact support immediately."
+        ),
+        data={},
+    )
 
 
 def login_with_google(token: str) -> User:
@@ -160,20 +219,41 @@ def login_with_google(token: str) -> User:
     Authenticate a user via Google ID token.
     Auto-registers or links existing accounts.
     """
+    from django.db import IntegrityError, transaction
+
+    from .exceptions import (
+        AccountConflict,
+        GoogleEmailUnverified,
+        GoogleTokenInvalid,
+        GoogleUnavailable,
+        InvalidCredentials,
+    )
     from .google import verify_google_id_token
     from .models import SocialAccount
 
     try:
         google_data = verify_google_id_token(token)
-    except ValueError as e:
-        logger.warning("Google login failed: %s", str(e))
-        raise ValueError("invalid_google_token") from e
+    except GoogleTokenInvalid as e:
+        logger.warning("Google login invalid token: %s", str(e))
+        raise
+    except GoogleUnavailable as e:
+        logger.warning("Google login unavailable: %s", str(e))
+        raise
 
     email = google_data.get("email", "").strip().lower()
     uid = google_data.get("sub")
 
+    if google_data.get("email_verified") is not True:
+        raise GoogleEmailUnverified("google_email_unverified")
+
     if not email or not uid:
-        raise ValueError("invalid_google_token")
+        raise GoogleTokenInvalid("invalid_google_token")
+
+    extra_data = {
+        k: google_data[k]
+        for k in ("name", "given_name", "family_name", "picture", "locale")
+        if k in google_data
+    }
 
     # Try to find by social account first
     try:
@@ -181,46 +261,97 @@ def login_with_google(token: str) -> User:
         user = social_acc.user
 
         if not user.is_active:
-            raise ValueError("invalid_credentials")
+            raise InvalidCredentials("invalid_credentials")
+
+        social_acc.email = email
+        social_acc.extra_data = extra_data
+        social_acc.last_login_at = timezone.now()
+        social_acc.save(update_fields=["email", "extra_data", "last_login_at"])
 
         return user
     except SocialAccount.DoesNotExist:
         pass
 
-    # Try to find by email
-    try:
-        user = User.objects.get(email=email)
+    with transaction.atomic():
+        user = User.objects.filter(email=email).first()
+        if user:
+            if not user.is_active:
+                raise InvalidCredentials("invalid_credentials")
 
-        if not user.is_active:
-            raise ValueError("invalid_credentials")
+            # Link account if not linked
+            try:
+                SocialAccount.objects.create(
+                    user=user,
+                    provider="google",
+                    provider_uid=uid,
+                    email=email,
+                    extra_data=extra_data,
+                    last_login_at=timezone.now(),
+                )
+                logger.info("Linked Google account to user_id=%s", user.id)
+            except IntegrityError:
+                # It means a SocialAccount with this provider_uid already exists.
+                # If we get here, it means it's linked to a DIFFERENT user!
+                raise AccountConflict("account_conflict")
 
-        # Link account
-        SocialAccount.objects.create(user=user, provider="google", provider_uid=uid)
-        logger.info("Linked Google account to user_id=%s", user.id)
+            if not user.is_email_verified and google_data.get("email_verified"):
+                user.is_email_verified = True
+                user.save(update_fields=["is_email_verified", "updated_at"])
+            return user
 
-        # If the email wasn't verified before, it is now
-        if not user.is_email_verified and google_data.get("email_verified"):
-            user.is_email_verified = True
-            user.save(update_fields=["is_email_verified", "updated_at"])
+        created = False
+        try:
+            with transaction.atomic():
+                user = User(
+                    email=email,
+                    first_name=google_data.get("given_name", ""),
+                    last_name=google_data.get("family_name", ""),
+                    is_email_verified=google_data.get("email_verified", False),
+                )
+                user.set_unusable_password()
+                user.save()
+                SocialAccount.objects.create(
+                    user=user,
+                    provider="google",
+                    provider_uid=uid,
+                    email=email,
+                    extra_data=extra_data,
+                    last_login_at=timezone.now(),
+                )
+                created = True
+        except IntegrityError:
+            # Race condition, another thread created the user concurrently
+            pass
+
+        if not created:
+            user = User.objects.get(email=email)
+            if not user.is_active:
+                raise InvalidCredentials("invalid_credentials")
+
+            try:
+                with transaction.atomic():
+                    social_acc, _ = SocialAccount.objects.get_or_create(
+                        user=user,
+                        provider="google",
+                        provider_uid=uid,
+                        defaults={
+                            "email": email,
+                            "extra_data": extra_data,
+                            "last_login_at": timezone.now(),
+                        },
+                    )
+                    social_acc.email = email
+                    social_acc.extra_data = extra_data
+                    social_acc.last_login_at = timezone.now()
+                    social_acc.save(update_fields=["email", "extra_data", "last_login_at"])
+            except IntegrityError:
+                raise AccountConflict("account_conflict")
+
+            if not user.is_email_verified and google_data.get("email_verified"):
+                user.is_email_verified = True
+                user.save(update_fields=["is_email_verified", "updated_at"])
 
         return user
-    except User.DoesNotExist:
-        pass
-
-    # Create new user
-    user = User(
-        email=email,
-        first_name=google_data.get("given_name", ""),
-        last_name=google_data.get("family_name", ""),
-        is_email_verified=google_data.get("email_verified", False),
-    )
-    user.set_unusable_password()
-    user.save()
-
-    SocialAccount.objects.create(user=user, provider="google", provider_uid=uid)
-    logger.info("Created new user via Google login: user_id=%s", user.id)
-
-    return user
 
 
 def send_password_reset_email(email: str) -> None:
@@ -243,7 +374,8 @@ def send_password_reset_email(email: str) -> None:
                 subject = "Reset your password - Study Assistant"
                 message = (
                     f"Hi {user.first_name},\n\n"
-                    "You requested to reset your password. Please click the link below to set a new password:\n\n"
+                    "You requested to reset your password. Please click the link below "
+                    "to set a new password:\n\n"
                     f"{reset_url}\n\n"
                     "If you didn't request this, you can safely ignore this email."
                 )
@@ -269,7 +401,6 @@ def confirm_password_reset(uid_b64: str, token: str, new_password: str) -> None:
     from django.contrib.auth.tokens import default_token_generator
     from django.utils.encoding import force_str
     from django.utils.http import urlsafe_base64_decode
-    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
     try:
         uid = force_str(urlsafe_base64_decode(uid_b64))
@@ -290,8 +421,19 @@ def confirm_password_reset(uid_b64: str, token: str, new_password: str) -> None:
     user.save(update_fields=["password", "is_email_verified", "updated_at"])
 
     # Invalidate all outstanding tokens for this user
-    tokens = OutstandingToken.objects.filter(user=user)
-    for t in tokens:
-        BlacklistedToken.objects.get_or_create(token=t)
+    revoke_all_refresh_tokens(user)
 
     logger.info("Password reset successfully for user_id=%s", user.id)
+    from apps.notifications.models import NotificationType
+    from apps.notifications.notification_service import NotificationService
+
+    NotificationService.notify(
+        recipient=user,
+        notification_type=NotificationType.SECURITY_PASSWORD_CHANGED,
+        title="Password Reset",
+        body=(
+            "Your password has been reset successfully. "
+            "If this was not you, please contact support immediately."
+        ),
+        data={},
+    )

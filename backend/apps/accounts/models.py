@@ -79,15 +79,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
-        constraints = [
-            # Case-insensitive uniqueness enforced at DB level.
-            # The manager normalises on save, but this constraint is a safety net.
-            models.UniqueConstraint(
-                models.functions.Lower("email"),
-                name="user_email_ci_unique",
-            ),
-        ]
-
+        
     def __str__(self):
         return self.email
 

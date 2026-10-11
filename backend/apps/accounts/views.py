@@ -9,7 +9,7 @@ Architecture ref: CLAUDE.md ("Thin views"), 01-authentication.md §4.
 
 import logging
 
-from rest_framework import status
+from rest_framework import permissions, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -33,12 +33,18 @@ class RegisterAPIView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = register_user(
-            email=serializer.validated_data["email"],
-            password=serializer.validated_data["password"],
-            first_name=serializer.validated_data["first_name"],
-            last_name=serializer.validated_data["last_name"],
-        )
+        from django.db import IntegrityError
+        from rest_framework import serializers
+
+        try:
+            user = register_user(
+                email=serializer.validated_data["email"],
+                password=serializer.validated_data["password"],
+                first_name=serializer.validated_data["first_name"],
+                last_name=serializer.validated_data["last_name"],
+            )
+        except IntegrityError:
+            raise serializers.ValidationError({"email": ["This email is already registered."]})
 
         response_data = UserSerializer(user).data
         return Response(response_data, status=status.HTTP_201_CREATED)
@@ -54,6 +60,7 @@ class VerifyEmailAPIView(APIView):
     def post(self, request, *args, **kwargs):
         from .serializers import VerifyEmailSerializer
         from .services import verify_email
+
         serializer = VerifyEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -61,9 +68,11 @@ class VerifyEmailAPIView(APIView):
             verify_email(serializer.validated_data["token"])
         except ValueError as e:
             from rest_framework.exceptions import APIException
+
             class VerifyEmailError(APIException):
                 status_code = 400
                 default_detail = "Validation error."
+
             raise VerifyEmailError(code=str(e))
 
         return Response({"detail": "Email verified."}, status=status.HTTP_200_OK)
@@ -101,31 +110,28 @@ class LoginAPIView(APIView):
     throttle_scope = "auth_login"
 
     def post(self, request, *args, **kwargs):
-        from django.contrib.auth.models import update_last_login
         from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
-        from rest_framework_simplejwt.tokens import RefreshToken
 
         from .cookies import set_refresh_cookie
         from .serializers import LoginSerializer, UserSerializer
-        from .services import authenticate_user
+        from .services import authenticate_user, issue_login_tokens
 
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        from .exceptions import EmailNotVerified, InvalidCredentials
 
         try:
             user = authenticate_user(
                 email=serializer.validated_data["email"],
                 password=serializer.validated_data["password"],
             )
-        except ValueError as e:
-            if str(e) == "invalid_credentials":
-                raise AuthenticationFailed(detail="Invalid credentials.", code="invalid_credentials")
-            elif str(e) == "email_not_verified":
-                raise PermissionDenied(detail="Email not verified.", code="email_not_verified")
-            raise
+        except InvalidCredentials:
+            raise AuthenticationFailed(detail="Invalid credentials.", code="invalid_credentials")
+        except EmailNotVerified:
+            raise PermissionDenied(detail="Email not verified.", code="email_not_verified")
 
-        update_last_login(None, user)
-        refresh = RefreshToken.for_user(user)
+        refresh = issue_login_tokens(user)
 
         response_data = {
             "access": str(refresh.access_token),
@@ -138,19 +144,18 @@ class LoginAPIView(APIView):
         return response
 
 
-import rest_framework
-
-
-class RequireXMLHttpRequest(rest_framework.permissions.BasePermission):
+class RequireXMLHttpRequest(permissions.BasePermission):
     """
     CSRF defence: requires X-Requested-With: XMLHttpRequest.
     """
+
     message = "Missing CSRF header."
     code = "csrf_header_missing"
 
     def has_permission(self, request, view):
         if request.META.get("HTTP_X_REQUESTED_WITH") != "XMLHttpRequest":
             from rest_framework.exceptions import PermissionDenied
+
             raise PermissionDenied(detail=self.message, code=self.code)
         return True
 
@@ -159,6 +164,7 @@ class TokenRefreshAPIView(APIView):
     """
     POST /api/v1/auth/token/refresh/
     """
+
     permission_classes = [AllowAny, RequireXMLHttpRequest]
 
     def post(self, request, *args, **kwargs):
@@ -174,7 +180,7 @@ class TokenRefreshAPIView(APIView):
         if not refresh_token_str:
             response = Response(
                 {"detail": "Refresh token missing.", "code": "refresh_missing"},
-                status=status.HTTP_401_UNAUTHORIZED
+                status=status.HTTP_401_UNAUTHORIZED,
             )
             clear_refresh_cookie(response)
             return response
@@ -184,22 +190,35 @@ class TokenRefreshAPIView(APIView):
         except TokenError:
             response = Response(
                 {"detail": "Refresh token invalid or expired.", "code": "refresh_invalid"},
-                status=status.HTTP_401_UNAUTHORIZED
+                status=status.HTTP_401_UNAUTHORIZED,
             )
             clear_refresh_cookie(response)
             return response
 
         # Check if user is still active
         from django.contrib.auth import get_user_model
-        User = get_user_model()
+
+        user_model = get_user_model()
         try:
-            user = User.objects.get(id=refresh.payload.get("user_id"))
+            user = user_model.objects.get(id=refresh.payload.get("user_id"))
             if not user.is_active:
                 raise TokenError("User inactive")
-        except (User.DoesNotExist, TokenError):
+        except (user_model.DoesNotExist, TokenError):
             response = Response(
                 {"detail": "User inactive or deleted.", "code": "refresh_invalid"},
-                status=status.HTTP_401_UNAUTHORIZED
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+            clear_refresh_cookie(response)
+            return response
+
+        import time
+
+        auth_time = refresh.get("auth_time", refresh["iat"])
+        max_age = getattr(settings, "AUTH_MAX_SESSION_AGE", 30 * 86400)
+        if time.time() - auth_time > max_age:
+            response = Response(
+                {"detail": "Session expired.", "code": "refresh_invalid"},
+                status=status.HTTP_401_UNAUTHORIZED,
             )
             clear_refresh_cookie(response)
             return response
@@ -207,11 +226,9 @@ class TokenRefreshAPIView(APIView):
         # Rotate token
         refresh.blacklist()
         new_refresh = RefreshToken.for_user(user)
+        new_refresh["auth_time"] = auth_time
 
-        response = Response(
-            {"access": str(new_refresh.access_token)},
-            status=status.HTTP_200_OK
-        )
+        response = Response({"access": str(new_refresh.access_token)}, status=status.HTTP_200_OK)
         set_refresh_cookie(response, str(new_refresh))
         return response
 
@@ -220,6 +237,7 @@ class LogoutAPIView(APIView):
     """
     POST /api/v1/auth/logout/
     """
+
     permission_classes = [AllowAny, RequireXMLHttpRequest]
 
     def post(self, request, *args, **kwargs):
@@ -231,14 +249,29 @@ class LogoutAPIView(APIView):
 
         cookie_name = settings.AUTH_REFRESH_COOKIE_NAME
         refresh_token_str = request.COOKIES.get(cookie_name)
+        user_id = None
 
         if refresh_token_str:
             try:
                 refresh = RefreshToken(refresh_token_str)
+                user_id = refresh.payload.get("user_id")
                 refresh.blacklist()
             except TokenError:
                 # Token already invalid or blacklisted, ignore
                 pass
+
+        push_endpoint = request.data.get("push_endpoint")
+        if push_endpoint:
+            from django.utils import timezone
+
+            from apps.notifications.models import PushSubscription
+
+            subs = PushSubscription.objects.filter(endpoint=push_endpoint, revoked_at__isnull=True)
+            if request.user and request.user.is_authenticated:
+                subs = subs.filter(user=request.user)
+            elif user_id:
+                subs = subs.filter(user_id=user_id)
+            subs.update(revoked_at=timezone.now())
 
         response = Response(status=status.HTTP_205_RESET_CONTENT)
         clear_refresh_cookie(response)
@@ -249,8 +282,10 @@ class MeAPIView(APIView):
     """
     GET /api/v1/auth/me/
     """
+
     # Requires authentication (which is set globally, but we can be explicit)
     from rest_framework.permissions import IsAuthenticated
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -263,6 +298,7 @@ class MeAPIView(APIView):
         # is still active (JWT tokens don't check the DB automatically unless configured to)
         if not user.is_active:
             from rest_framework.exceptions import AuthenticationFailed
+
             raise AuthenticationFailed("User is inactive", code="user_inactive")
 
         serializer = UserSerializer(user)
@@ -273,7 +309,9 @@ class ChangePasswordAPIView(APIView):
     """
     POST /api/v1/auth/password/change/
     """
+
     from rest_framework.permissions import IsAuthenticated
+
     permission_classes = [IsAuthenticated]
     throttle_scope = "auth_password"
 
@@ -289,43 +327,71 @@ class ChangePasswordAPIView(APIView):
             new_password=serializer.validated_data["password"],
         )
 
-        return Response(
-            {"detail": "Password changed successfully."},
-            status=status.HTTP_200_OK
+        import time
+
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        from .cookies import set_refresh_cookie
+
+        new_refresh = RefreshToken.for_user(request.user)
+        new_refresh["auth_time"] = int(time.time())
+
+        response = Response(
+            {"detail": "Password changed successfully.", "access": str(new_refresh.access_token)},
+            status=status.HTTP_200_OK,
         )
+        set_refresh_cookie(response, str(new_refresh))
+        return response
 
 
 class GoogleLoginAPIView(APIView):
     """
     POST /api/v1/auth/google/
     """
+
     permission_classes = [AllowAny]
     throttle_scope = "auth_login"
 
     def post(self, request, *args, **kwargs):
-        from django.contrib.auth.models import update_last_login
         from rest_framework.exceptions import AuthenticationFailed
-        from rest_framework_simplejwt.tokens import RefreshToken
 
         from .cookies import set_refresh_cookie
         from .serializers import GoogleLoginSerializer, UserSerializer
-        from .services import login_with_google
+        from .services import issue_login_tokens, login_with_google
 
         serializer = GoogleLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        from .exceptions import (
+            AccountConflict,
+            ConflictError,
+            GoogleEmailUnverified,
+            GoogleTokenInvalid,
+            GoogleUnavailable,
+            InvalidCredentials,
+            ServiceUnavailable,
+        )
+
         try:
             user = login_with_google(serializer.validated_data["token"])
-        except ValueError as e:
-            if str(e) == "invalid_google_token":
-                from rest_framework.exceptions import AuthenticationFailed
-                raise AuthenticationFailed(detail="Invalid Google token.", code="invalid_google_token")
-            elif str(e) == "invalid_credentials":
-                raise AuthenticationFailed(detail="Invalid credentials.", code="invalid_credentials")
-            raise
+        except GoogleTokenInvalid:
+            raise AuthenticationFailed(detail="Invalid Google token.", code="invalid_google_token")
+        except InvalidCredentials:
+            raise AuthenticationFailed(detail="Invalid credentials.", code="invalid_credentials")
+        except GoogleEmailUnverified:
+            raise AuthenticationFailed(
+                detail="Google email not verified.", code="google_email_unverified"
+            )
+        except AccountConflict:
+            raise ConflictError(
+                detail="Account already linked to another user.", code="account_conflict"
+            )
+        except GoogleUnavailable:
+            raise ServiceUnavailable(
+                detail="Google service unavailable.", code="google_unavailable"
+            )
 
-        update_last_login(None, user)
-        refresh = RefreshToken.for_user(user)
+        refresh = issue_login_tokens(user)
 
         response_data = {
             "access": str(refresh.access_token),
@@ -342,6 +408,7 @@ class PasswordResetAPIView(APIView):
     """
     POST /api/v1/auth/password-reset/
     """
+
     permission_classes = [AllowAny]
     throttle_scope = "auth_email"
 
@@ -364,6 +431,7 @@ class PasswordResetConfirmAPIView(APIView):
     """
     POST /api/v1/auth/password-reset/confirm/
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):

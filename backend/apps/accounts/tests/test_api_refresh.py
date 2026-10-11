@@ -102,3 +102,25 @@ class TestTokenRefreshAPI:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert response.data["code"] == "csrf_header_missing"
+
+    def test_refresh_rejected_after_max_session_age(self, api_client, user):
+        import time
+        with freeze_time("2026-01-01 12:00:00"):
+            refresh = RefreshToken.for_user(user)
+            refresh["auth_time"] = int(time.time())
+            
+        with freeze_time("2026-01-04 12:00:00"):
+            # Rotate at day 3 (within 7 days)
+            api_client.cookies[settings.AUTH_REFRESH_COOKIE_NAME] = str(refresh)
+            res1 = api_client.post(self.url, **self.get_headers())
+            assert res1.status_code == 200
+            refresh2_str = res1.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value
+            
+        with freeze_time("2026-01-06 12:00:00"):
+            # Mock settings.AUTH_MAX_SESSION_AGE to 4 days (4 * 86400)
+            settings.AUTH_MAX_SESSION_AGE = 4 * 86400
+            # Try to rotate at day 5. 5 days > 4 days auth max age
+            api_client.cookies[settings.AUTH_REFRESH_COOKIE_NAME] = refresh2_str
+            res2 = api_client.post(self.url, **self.get_headers())
+            assert res2.status_code == status.HTTP_401_UNAUTHORIZED
+            assert res2.data["code"] == "refresh_invalid"
