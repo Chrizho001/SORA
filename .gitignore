@@ -47,5 +47,13 @@ coverage.xml
 # Docker volumes
 pgdata/
 
-# Docs
-docs/design-inspiration/
+# Docs & Design
+docs/
+design/
+DESIGN.md
+PRODUCT.md
+
+# Agent & Tooling Customizations (Local)
+.agents/
+.claude/
+.impeccable/

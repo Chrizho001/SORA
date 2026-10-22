@@ -1,0 +1,21 @@
+{% autoescape off %}
+============================================================
+SORA — AI STUDY COMPANION
+============================================================
+
+Hi {{ first_name|default:"Student" }},
+
+Welcome to SORA! We're thrilled to have you on board.
+
+Please confirm your email address to activate your account and start turning lectures into flashcards and speed quizzes:
+
+{{ verification_url }}
+
+Note: This verification link is valid for 24 hours.
+
+If you didn't create an account with SORA, you can safely ignore this email.
+
+------------------------------------------------------------
+© 2026 SORA. Study smarter, not harder.
+{{ frontend_url }}
+{% endautoescape %}

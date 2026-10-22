@@ -46,26 +46,26 @@ def send_verification_email(user: User) -> None:
 
     Architecture ref: 01-authentication.md §5 (Business rules #5).
     """
+    from .emails import send_templated_email
+
     token = dumps({"uid": str(user.id)}, salt="accounts.verify-email")
     verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    subject = "Verify your email — SORA"
 
-    subject = "Verify your email - Study Assistant"
-    message = (
-        f"Hi {user.first_name},\n\n"
-        "Welcome to Study Assistant! Please verify your email address "
-        "by clicking the link below:\n\n"
-        f"{verification_url}\n\n"
-        "If you did not sign up for this account, you can safely ignore this email."
-    )
-
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
-    )
-    logger.info("Verification email sent to user_id=%s", user.id)
+    try:
+        send_templated_email(
+            subject=subject,
+            template_prefix="accounts/email/verify_email",
+            context={
+                "first_name": user.first_name,
+                "verification_url": verification_url,
+            },
+            recipient_email=user.email,
+            mascot_filename="sora_mascot_welcome.png",
+        )
+        logger.info("Verification email sent to user_id=%s", user.id)
+    except Exception as e:
+        logger.error("Failed to send verification email to %s: %s", user.email, e)
 
 
 def verify_email(token: str) -> None:
@@ -362,6 +362,8 @@ def send_password_reset_email(email: str) -> None:
     from django.utils.encoding import force_bytes
     from django.utils.http import urlsafe_base64_encode
 
+    from .emails import send_templated_email
+
     email = email.strip().lower()
     try:
         user = User.objects.get(email=email)
@@ -371,22 +373,21 @@ def send_password_reset_email(email: str) -> None:
 
             def _send_email():
                 reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
-                subject = "Reset your password - Study Assistant"
-                message = (
-                    f"Hi {user.first_name},\n\n"
-                    "You requested to reset your password. Please click the link below "
-                    "to set a new password:\n\n"
-                    f"{reset_url}\n\n"
-                    "If you didn't request this, you can safely ignore this email."
-                )
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-                logger.info("Password reset email sent to user_id=%s", user.id)
+                subject = "Reset your password — SORA"
+                try:
+                    send_templated_email(
+                        subject=subject,
+                        template_prefix="accounts/email/password_reset",
+                        context={
+                            "first_name": user.first_name,
+                            "reset_url": reset_url,
+                        },
+                        recipient_email=user.email,
+                        mascot_filename="sora_mascot_security.png",
+                    )
+                    logger.info("Password reset email sent to user_id=%s", user.id)
+                except Exception as e:
+                    logger.error("Failed to send password reset email to %s: %s", user.email, e)
 
             transaction.on_commit(_send_email)
     except User.DoesNotExist:

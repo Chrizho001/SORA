@@ -1,0 +1,54 @@
+{% extends "accounts/email/base_email.html" %}
+
+{% block title %}Verify your email — SORA{% endblock %}
+
+{% block preview_text %}Welcome to SORA, {{ first_name|default:"there" }}! Confirm your email to activate your account and unlock your study dashboard.{% endblock %}
+
+{% block mascot_speech %}
+<div style="display: inline-block; margin-bottom: 12px; padding: 6px 16px; background-color: #f4f8f4; border: 1px solid #d9edd9; border-radius: 9999px; font-size: 12px; font-weight: 600; color: #1e6b36; letter-spacing: -0.01em;">
+  🚀 Ready to level up your study sessions!
+</div>
+{% endblock %}
+
+{% block heading %}
+Welcome to SORA! 👋
+{% endblock %}
+
+{% block body_content %}
+Hi <strong style="color: #141413;">{{ first_name|default:"Student" }}</strong>, we're thrilled to welcome you to <strong>SORA</strong>. Please confirm your email address to activate your account and start turning long lectures into crisp flashcards and speed quizzes.
+{% endblock %}
+
+{% block feature_highlights %}
+<table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin-bottom: 30px; background-color: #faf9f6; border-radius: 16px; border: 1px solid #eeeae1;">
+  <tr>
+    <td style="padding: 18px 20px;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation">
+        <tr>
+          <td width="33%" align="center" style="padding: 6px; font-size: 12px; font-weight: 600; color: #52514d;">
+            <div style="font-size: 20px; margin-bottom: 4px;">📄</div>
+            PDF Summaries
+          </td>
+          <td width="34%" align="center" style="padding: 6px; font-size: 12px; font-weight: 600; color: #52514d; border-left: 1px solid #e7e3da; border-right: 1px solid #e7e3da;">
+            <div style="font-size: 20px; margin-bottom: 4px;">🧠</div>
+            Smart Flashcards
+          </td>
+          <td width="33%" align="center" style="padding: 6px; font-size: 12px; font-weight: 600; color: #52514d;">
+            <div style="font-size: 20px; margin-bottom: 4px;">⚡</div>
+            Speed Quizzes
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block button_url %}{{ verification_url|safe }}{% endblock %}
+{% block button_text %}Verify Email Address &rarr;{% endblock %}
+
+{% block expiration_notice %}
+<strong style="color: #2e2d29;">⏱️ Link Expiration:</strong> This verification link is active for <strong>24 hours</strong>. If you did not create an account on SORA, you can safely ignore this message.
+{% endblock %}
+
+{% block raw_link %}{{ verification_url|safe }}{% endblock %}
+{% block raw_link_text %}{{ verification_url }}{% endblock %}
