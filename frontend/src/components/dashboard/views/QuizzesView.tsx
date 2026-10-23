@@ -145,14 +145,14 @@ export function QuizzesView({
                           type="button"
                           onClick={() => handleSelectChoice(q.id, choice)}
                           disabled={isFinished}
-                          className={`w-full text-left p-3 rounded-xl border text-xs font-body transition-all flex items-center justify-between ${
+                          className={`w-full text-left p-3 rounded-xl border text-xs font-body transition-all duration-150 active:scale-[0.99] flex items-center justify-between ${
                             isCorrect
-                              ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold"
+                              ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold shadow-xs"
                               : isWrong
-                              ? "bg-rose-50 border-rose-400 text-rose-900"
+                              ? "bg-rose-50 border-rose-400 text-rose-900 shadow-xs"
                               : isChoiceSelected
-                              ? "bg-night text-[#c8f560] border-night font-semibold shadow-xs"
-                              : "bg-surface hover:bg-mist border-line text-ink"
+                              ? "bg-night text-[#c8f560] border-night font-semibold shadow-sm scale-[1.01]"
+                              : "bg-surface hover:bg-mist hover:border-line-strong text-ink"
                           }`}
                         >
                           <span>{choice}</span>

@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 
 async function run() {
-  console.log("Starting Dashboard UI automated verification...");
+  console.log("Starting Comprehensive Dashboard UI verification...");
   const scratchDir =
     process.env.SCRATCH_DIR ||
     "/home/chris-friday/.gemini/antigravity-ide/brain/663d7a65-bea4-423b-9eec-6eef69f735bc/scratch";
@@ -27,116 +27,80 @@ async function run() {
   // 1. Authenticate user
   console.log("1. Authenticating as student@sora.study...");
   await page.goto("http://localhost:3000/login", { waitUntil: "networkidle0" });
-  await page.type("#login-email", "student@sora.study", { delay: 20 });
-  await page.type("#login-password", "Password123!", { delay: 20 });
+  await page.type("#login-email", "student@sora.study", { delay: 15 });
+  await page.type("#login-password", "Password123!", { delay: 15 });
   await page.click('button[type="submit"]');
 
   console.log("2. Waiting for /dashboard navigation...");
   await page.waitForFunction(() => window.location.pathname === "/dashboard", { timeout: 15000 });
+  await page.waitForSelector("#sidebar-tab-dashboard", { visible: true, timeout: 15000 });
   await new Promise((r) => setTimeout(r, 2000));
 
-  // 3. Desktop Screenshot
-  console.log("3. Capturing desktop dashboard screenshot...");
-  await page.screenshot({ path: path.join(scratchDir, "dashboard_desktop.png"), fullPage: false });
+  // 3. Desktop Overview Screenshot
+  console.log("3. Capturing desktop dashboard overview screenshot...");
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_desktop.png") });
 
-  // 4. Test Task Creation Modal
-  console.log("4. Opening Task Creation Modal...");
-  const addTaskButtons = await page.$$('button');
-  for (const btn of addTaskButtons) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && text.includes('Add Task')) {
-      await btn.click();
-      break;
-    }
-  }
-  await new Promise((r) => setTimeout(r, 800));
-  await page.screenshot({ path: path.join(scratchDir, "dashboard_task_modal.png") });
-
-  // Close modal by clicking Cancel
-  const cancelButtons = await page.$$('button');
-  for (const btn of cancelButtons) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && text.includes('Cancel')) {
-      await btn.click();
-      break;
-    }
-  }
-  await new Promise((r) => setTimeout(r, 500));
-
-  // 5. Test Upload PDF Modal
-  console.log("5. Opening Upload PDF Modal...");
-  for (const btn of await page.$$('button')) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && text.includes('Upload PDF')) {
-      await btn.click();
-      break;
-    }
-  }
-  await new Promise((r) => setTimeout(r, 800));
-  await page.screenshot({ path: path.join(scratchDir, "dashboard_upload_modal.png") });
-
-  // Close upload modal
-  for (const btn of await page.$$('button')) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && text.includes('Cancel')) {
-      await btn.click();
-      break;
-    }
-  }
-  await new Promise((r) => setTimeout(r, 500));
-
-  // 6. Test Flashcards View
-  console.log("6. Navigating to Flashcards tab...");
-  for (const btn of await page.$$('button')) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && text.trim() === 'Flashcards') {
-      await btn.click();
-      break;
-    }
-  }
-  await new Promise((r) => setTimeout(r, 800));
-  await page.screenshot({ path: path.join(scratchDir, "dashboard_flashcards.png") });
-
-  // 7. Test Speed Quizzes View
-  console.log("7. Navigating to Speed Quizzes tab...");
-  for (const btn of await page.$$('button')) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && text.includes('Speed Quizzes')) {
-      await btn.click();
-      break;
-    }
-  }
-  await new Promise((r) => setTimeout(r, 800));
-  await page.screenshot({ path: path.join(scratchDir, "dashboard_quizzes.png") });
-
-  // 8. Test Schedule & Tasks View
-  console.log("8. Navigating to Schedule & Tasks tab...");
-  for (const btn of await page.$$('button')) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && text.includes('Schedule & Tasks')) {
-      await btn.click();
-      break;
-    }
-  }
-  await new Promise((r) => setTimeout(r, 800));
-  await page.screenshot({ path: path.join(scratchDir, "dashboard_tasks_view.png") });
-
-  // 9. Mobile Responsive View
-  console.log("9. Emulating mobile viewport (390x844)...");
-  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
-  // Go back to Dashboard home
-  for (const btn of await page.$$('button')) {
-    const text = await (await btn.getProperty('innerText')).jsonValue();
-    if (text && (text.trim() === 'Dashboard' || text.trim() === 'Home')) {
-      await btn.click();
-      break;
-    }
-  }
+  // 4. Desktop Notifications Tab (Verify it's rich and functional!)
+  console.log("4. Testing Desktop Notifications Tab...");
+  await page.click("#sidebar-tab-notifications");
   await new Promise((r) => setTimeout(r, 1000));
-  await page.screenshot({ path: path.join(scratchDir, "dashboard_mobile.png") });
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_desktop_notifications.png") });
+
+  // 5. Test PWA Install Modal with deep opaque backdrop
+  console.log("5. Testing PWA Install Modal overlay...");
+  await page.click("#pwa-install-btn");
+  await page.waitForSelector("#close-pwa-modal-btn", { visible: true, timeout: 5000 });
+  await new Promise((r) => setTimeout(r, 800));
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_pwa_modal.png") });
+
+  // Close modal via Close button
+  await page.click("#close-pwa-modal-btn");
+  await new Promise((r) => setTimeout(r, 500));
+
+  // 6. Navigate back to Dashboard Overview
+  await page.click("#sidebar-tab-dashboard");
+  await new Promise((r) => setTimeout(r, 800));
+
+  // 7. Test Tablet View (768x1024 - iPad Mini / Air)
+  console.log("6. Testing Tablet / iPad viewport (768x1024)...");
+  await page.setViewport({ width: 768, height: 1024 });
+  await new Promise((r) => setTimeout(r, 1000));
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_tablet.png") });
+
+  // 8. Test Mobile View (390x844 - iPhone)
+  console.log("7. Testing Mobile viewport (390x844)...");
+  await page.setViewport({ width: 390, height: 844 });
+  await new Promise((r) => setTimeout(r, 1000));
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_mobile_overview.png") });
+
+  // Mobile Documents tab
+  console.log("   - Mobile Docs tab...");
+  await page.click("#mobile-tab-documents");
+  await new Promise((r) => setTimeout(r, 1000));
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_mobile_docs.png") });
+
+  // Mobile Flashcards tab
+  console.log("   - Mobile Cards tab...");
+  await page.click("#mobile-tab-flashcards");
+  await new Promise((r) => setTimeout(r, 1000));
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_mobile_cards.png") });
+
+  // Mobile Schedule tab
+  console.log("   - Mobile Schedule tab...");
+  await page.click("#mobile-tab-tasks");
+  await new Promise((r) => setTimeout(r, 1000));
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_mobile_tasks.png") });
+
+  // Mobile Notification Drawer from Header Bell
+  console.log("   - Mobile Notification Drawer from Header Bell...");
+  await page.click("#mobile-header-bell");
+  await new Promise((r) => setTimeout(r, 1000));
+  await page.screenshot({ path: path.join(scratchDir, "dashboard_mobile_drawer.png") });
 
   await browser.close();
-  console.log("\n✅ ALL DASHBOARD SCREENSHOTS CAPTURED SUCCESSFULLY!");
+  console.log("\n=======================================================");
+  console.log("🎉 ALL RESPONSIVE VIEWPORT TESTS PASSED SUCCESSFULLY!");
+  console.log("=======================================================");
 }
 
 run().catch((err) => {

@@ -163,7 +163,7 @@ export function DocumentsView({
                     <button
                       type="button"
                       onClick={() => setSelectedSummaryDoc(doc)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-canvas hover:bg-mist text-ink text-xs font-display font-semibold border border-line transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-canvas hover:bg-mist text-ink text-xs font-display font-semibold border border-line hover:scale-105 active:scale-95 transition-all"
                     >
                       <BookOpen className="size-3.5 text-muted" />
                       <span>Read Summary</span>
@@ -175,7 +175,7 @@ export function DocumentsView({
                       type="button"
                       onClick={() => onGenerateFlashcards(doc.id)}
                       disabled={isFlashcardsGenerating}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-display font-semibold transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-display font-semibold hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
                     >
                       <Brain className="size-3.5 text-purple-600" />
                       <span>{isFlashcardsGenerating ? "Building Decks..." : "Make Flashcards"}</span>
@@ -186,7 +186,7 @@ export function DocumentsView({
                     <button
                       type="button"
                       onClick={() => onStartQuiz(doc.id)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-display font-semibold transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-display font-semibold hover:scale-105 active:scale-95 transition-all"
                     >
                       <Zap className="size-3.5 text-amber-600" />
                       <span>Speed Quiz</span>

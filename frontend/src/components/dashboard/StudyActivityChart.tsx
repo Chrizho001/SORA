@@ -96,10 +96,10 @@ export function StudyActivityChart({ className = "" }: { className?: string }) {
           <button
             type="button"
             onClick={() => setTimeframe("weekly")}
-            className={`px-3 py-1 rounded-full transition-all duration-200 ${
+            className={`px-3 py-1 rounded-full transition-all duration-200 active:scale-95 ${
               timeframe === "weekly"
                 ? "bg-night text-[#c8f560] font-semibold shadow-sm"
-                : "text-muted hover:text-ink"
+                : "text-muted hover:text-ink hover:bg-mist"
             }`}
           >
             Weekly
@@ -107,10 +107,10 @@ export function StudyActivityChart({ className = "" }: { className?: string }) {
           <button
             type="button"
             onClick={() => setTimeframe("monthly")}
-            className={`px-3 py-1 rounded-full transition-all duration-200 ${
+            className={`px-3 py-1 rounded-full transition-all duration-200 active:scale-95 ${
               timeframe === "monthly"
                 ? "bg-night text-[#c8f560] font-semibold shadow-sm"
-                : "text-muted hover:text-ink"
+                : "text-muted hover:text-ink hover:bg-mist"
             }`}
           >
             Monthly

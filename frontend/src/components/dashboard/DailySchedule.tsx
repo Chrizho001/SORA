@@ -72,7 +72,7 @@ export function DailySchedule({
           <button
             type="button"
             onClick={onAddTaskClick}
-            className="text-xs font-display font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
+            className="text-xs font-display font-semibold text-emerald-700 hover:text-emerald-800 hover:scale-105 active:scale-95 transition-all"
           >
             + Add New
           </button>

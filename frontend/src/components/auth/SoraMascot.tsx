@@ -7,7 +7,7 @@ export type MascotEmotion = "neutral" | "happy" | "angry" | "focused" | "thinkin
 interface SoraMascotProps {
   emotion?: MascotEmotion;
   className?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   message?: string;
   showSpeechBubble?: boolean;
 }
@@ -37,7 +37,7 @@ export function SoraMascot({
 
       const angle = Math.atan2(deltaY, deltaX);
       const distance = Math.min(Math.hypot(deltaX, deltaY), 300);
-      const maxOffset = size === "sm" ? 6 : size === "md" ? 9 : 12;
+      const maxOffset = size === "xs" ? 3 : size === "sm" ? 6 : size === "md" ? 9 : 12;
       const normalizedDist = (distance / 300) * maxOffset;
 
       setEyeOffset({
@@ -65,8 +65,10 @@ export function SoraMascot({
 
   // Determine size dimensions
   const dims =
-    size === "sm"
-      ? { width: 140, height: 140 }
+    size === "xs"
+      ? { width: 52, height: 52 }
+      : size === "sm"
+      ? { width: 120, height: 120 }
       : size === "md"
       ? { width: 200, height: 200 }
       : { width: 280, height: 280 };

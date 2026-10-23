@@ -15,6 +15,7 @@ import { DocumentsView } from "@/components/dashboard/views/DocumentsView";
 import { FlashcardsView } from "@/components/dashboard/views/FlashcardsView";
 import { QuizzesView } from "@/components/dashboard/views/QuizzesView";
 import { TasksView } from "@/components/dashboard/views/TasksView";
+import { NotificationsView } from "@/components/dashboard/views/NotificationsView";
 import { SettingsView } from "@/components/dashboard/views/SettingsView";
 import {
   useDocuments,
@@ -110,17 +111,12 @@ export default function DashboardPage() {
   if (isLoading || (!user && !isLoggingOut)) {
     return (
       <main className="min-h-dvh flex flex-col items-center justify-center bg-paper p-4">
-        <div className="flex flex-col items-center space-y-4">
+        <div className="flex flex-col items-center justify-center animate-pulse">
           <SoraMascot
             size="md"
             emotion="thinking"
-            message="Restoring student session..."
-            showSpeechBubble={true}
+            showSpeechBubble={false}
           />
-          <div className="flex items-center gap-2 text-muted text-sm font-display animate-pulse">
-            <span className="size-2 rounded-full bg-night animate-ping" />
-            <span>Verifying authenticated session...</span>
-          </div>
         </div>
       </main>
     );
@@ -216,6 +212,15 @@ export default function DashboardPage() {
             />
           )}
 
+          {activeTab === "notifications" && (
+            <NotificationsView
+              notifications={notifications}
+              onMarkRead={(id) => markReadMutation.mutate(id)}
+              onMarkAllRead={() => markAllReadMutation.mutate()}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
+
           {activeTab === "settings" && <SettingsView user={user} />}
         </main>
       </div>
@@ -223,14 +228,7 @@ export default function DashboardPage() {
       {/* Mobile Bottom Sticky Navigation */}
       <MobileBottomBar
         activeTab={activeTab}
-        onTabChange={(tab) => {
-          if (tab === "notifications") {
-            setIsNotificationDrawerOpen(true);
-          } else {
-            setActiveTab(tab);
-          }
-        }}
-        unreadCount={unreadCount}
+        onTabChange={setActiveTab}
       />
 
 

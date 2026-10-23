@@ -89,8 +89,8 @@ export function TasksView({
               <button
                 type="button"
                 onClick={() => setPriorityFilter(null)}
-                className={`px-2.5 py-1 rounded-full ${
-                  priorityFilter === null ? "bg-night text-[#c8f560] font-bold" : "bg-canvas text-muted hover:text-ink"
+                className={`px-3 py-1 rounded-full transition-all duration-200 active:scale-95 ${
+                  priorityFilter === null ? "bg-night text-[#c8f560] font-bold shadow-xs" : "bg-canvas text-muted hover:text-ink hover:bg-mist"
                 }`}
               >
                 All
@@ -98,8 +98,8 @@ export function TasksView({
               <button
                 type="button"
                 onClick={() => setPriorityFilter(3)}
-                className={`px-2.5 py-1 rounded-full ${
-                  priorityFilter === 3 ? "bg-rose-100 text-rose-800 font-bold" : "bg-canvas text-muted hover:text-ink"
+                className={`px-3 py-1 rounded-full transition-all duration-200 active:scale-95 ${
+                  priorityFilter === 3 ? "bg-rose-100 text-rose-800 font-bold border border-rose-300 shadow-xs" : "bg-canvas text-muted hover:text-ink hover:bg-mist"
                 }`}
               >
                 High
@@ -107,8 +107,8 @@ export function TasksView({
               <button
                 type="button"
                 onClick={() => setPriorityFilter(2)}
-                className={`px-2.5 py-1 rounded-full ${
-                  priorityFilter === 2 ? "bg-amber-100 text-amber-800 font-bold" : "bg-canvas text-muted hover:text-ink"
+                className={`px-3 py-1 rounded-full transition-all duration-200 active:scale-95 ${
+                  priorityFilter === 2 ? "bg-amber-100 text-amber-800 font-bold border border-amber-300 shadow-xs" : "bg-canvas text-muted hover:text-ink hover:bg-mist"
                 }`}
               >
                 Medium
@@ -116,8 +116,8 @@ export function TasksView({
               <button
                 type="button"
                 onClick={() => setPriorityFilter(1)}
-                className={`px-2.5 py-1 rounded-full ${
-                  priorityFilter === 1 ? "bg-blue-100 text-blue-800 font-bold" : "bg-canvas text-muted hover:text-ink"
+                className={`px-3 py-1 rounded-full transition-all duration-200 active:scale-95 ${
+                  priorityFilter === 1 ? "bg-blue-100 text-blue-800 font-bold border border-blue-300 shadow-xs" : "bg-canvas text-muted hover:text-ink hover:bg-mist"
                 }`}
               >
                 Low

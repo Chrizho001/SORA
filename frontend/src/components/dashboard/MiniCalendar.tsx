@@ -190,13 +190,13 @@ export function MiniCalendar({
               key={idx}
               type="button"
               onClick={() => onSelectDate(cell.isSelected ? null : cell.dateKey)}
-              className={`relative size-8 sm:size-9 rounded-full flex flex-col items-center justify-center text-xs font-display transition-all duration-200 mx-auto ${
+              className={`relative size-8 sm:size-9 rounded-full flex flex-col items-center justify-center text-xs font-display transition-all duration-200 active:scale-90 mx-auto ${
                 cell.isSelected
                   ? "bg-night text-white font-bold shadow-md scale-105"
                   : cell.isToday
                   ? "bg-[#c8f560] text-[#141413] font-bold shadow-sm"
                   : cell.isCurrentMonth
-                  ? "text-ink hover:bg-mist hover:text-night font-medium"
+                  ? "text-ink hover:bg-mist hover:text-night hover:scale-105 font-medium"
                   : "text-line-strong hover:text-muted"
               }`}
               title={cell.dateKey}

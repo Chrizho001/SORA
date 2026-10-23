@@ -119,18 +119,18 @@ export function DashboardHomeView({
       {/* Top 4 Quick Stats & AI Guide Cards (inspired by 'New Courses' & 'Go Premium' card in design/dashboard.webp) */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Summarized Documents */}
-        <div className="rounded-3xl bg-surface border border-line p-5 shadow-soft hover:shadow-lift transition-all duration-300 flex flex-col justify-between">
+        <div className="group rounded-3xl bg-surface border border-line p-5 shadow-soft hover:shadow-lift hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <div className="size-11 rounded-2xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center shadow-xs">
+            <div className="size-11 rounded-2xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-300">
               <BookOpen className="size-5.5" />
             </div>
             <button
               type="button"
               onClick={() => onNavigateTab("documents")}
-              className="text-subtle hover:text-ink text-xs font-display flex items-center gap-1"
+              className="text-subtle group-hover:text-ink text-xs font-display flex items-center gap-1 transition-colors"
             >
               <span>View All</span>
-              <ArrowRight className="size-3" />
+              <ArrowRight className="size-3 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
@@ -149,18 +149,18 @@ export function DashboardHomeView({
         </div>
 
         {/* Card 2: Smart Flashcards */}
-        <div className="rounded-3xl bg-surface border border-line p-5 shadow-soft hover:shadow-lift transition-all duration-300 flex flex-col justify-between">
+        <div className="group rounded-3xl bg-surface border border-line p-5 shadow-soft hover:shadow-lift hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <div className="size-11 rounded-2xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center shadow-xs">
+            <div className="size-11 rounded-2xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-300">
               <Brain className="size-5.5" />
             </div>
             <button
               type="button"
               onClick={() => onNavigateTab("flashcards")}
-              className="text-subtle hover:text-ink text-xs font-display flex items-center gap-1"
+              className="text-subtle group-hover:text-ink text-xs font-display flex items-center gap-1 transition-colors"
             >
               <span>Review</span>
-              <ArrowRight className="size-3" />
+              <ArrowRight className="size-3 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
@@ -177,18 +177,18 @@ export function DashboardHomeView({
         </div>
 
         {/* Card 3: Speed Quizzes Performance */}
-        <div className="rounded-3xl bg-surface border border-line p-5 shadow-soft hover:shadow-lift transition-all duration-300 flex flex-col justify-between">
+        <div className="group rounded-3xl bg-surface border border-line p-5 shadow-soft hover:shadow-lift hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <div className="size-11 rounded-2xl bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shadow-xs">
+            <div className="size-11 rounded-2xl bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-300">
               <Zap className="size-5.5" />
             </div>
             <button
               type="button"
               onClick={() => onNavigateTab("quizzes")}
-              className="text-subtle hover:text-ink text-xs font-display flex items-center gap-1"
+              className="text-subtle group-hover:text-ink text-xs font-display flex items-center gap-1 transition-colors"
             >
               <span>Quizzes</span>
-              <ArrowRight className="size-3" />
+              <ArrowRight className="size-3 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
@@ -207,7 +207,7 @@ export function DashboardHomeView({
         </div>
 
         {/* Card 4: SORA Study Helper Card (inspired by 'Go Premium' card in design/dashboard.webp) */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#161720] via-[#1a1c27] to-[#12131a] border border-[#2a2d3d] p-5 text-white shadow-lift flex flex-col justify-between">
+        <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#161720] via-[#1a1c27] to-[#12131a] border border-[#2a2d3d] p-5 text-white shadow-lift hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-1.5 text-xs font-display font-bold text-[#c8f560]">
               <Sparkles className="size-3.5" />
@@ -217,12 +217,11 @@ export function DashboardHomeView({
           </div>
 
           <div className="my-2 flex items-center gap-3">
-            <div className="shrink-0 -my-2 -ml-2">
+            <div className="shrink-0 group-hover:scale-105 transition-transform duration-300">
               <SoraMascot
-                size="sm"
+                size="xs"
                 emotion="happy"
                 showSpeechBubble={false}
-                className="scale-65 origin-left"
               />
             </div>
             <div className="min-w-0">
@@ -238,10 +237,10 @@ export function DashboardHomeView({
           <button
             type="button"
             onClick={onUploadClick}
-            className="w-full h-8 rounded-xl bg-[#c8f560] hover:bg-[#b8ea4b] text-[#141413] text-xs font-display font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
+            className="w-full h-8.5 rounded-xl bg-[#c8f560] hover:bg-[#b8ea4b] hover:shadow-[0_0_15px_rgba(200,245,96,0.35)] text-[#141413] text-xs font-display font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
           >
             <span>Upload Document</span>
-            <ArrowRight className="size-3" />
+            <ArrowRight className="size-3 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
       </section>
