@@ -37,7 +37,7 @@ export const getStoredAccessToken = (): string | null => {
 };
 
 /**
- * Configured Axios instance for SORA Authentication
+  * Configured Axios instance for SORA Authentication
  * - withCredentials: true ensures HttpOnly refresh cookies are transmitted across origins
  * - X-Requested-With: XMLHttpRequest triggers Django CSRF protections for cookie endpoints
  */
@@ -85,3 +85,53 @@ authClient.interceptors.response.use(
     throw new AuthApiError(status, detail, code, errors);
   }
 );
+
+export const BACKEND_API_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8000/api/v1";
+
+/**
+ * General API Client for SORA Backend (Documents, Flashcards, Quizzes, Tasks, Notifications)
+ */
+export const apiClient: AxiosInstance = axios.create({
+  baseURL: BACKEND_API_BASE_URL,
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
+  },
+  timeout: 15000,
+});
+
+apiClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    if (inMemoryAccessToken && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError<{ detail?: string; code?: string; errors?: Record<string, string[]> }>) => {
+    if (!error.response) {
+      throw new AuthApiError(
+        0,
+        "Network connection failed. Please ensure the backend server is reachable.",
+        "network_error"
+      );
+    }
+
+    const { status, data } = error.response;
+    const detail =
+      data?.detail ||
+      (typeof data === "string" ? data : error.message) ||
+      "An unexpected error occurred.";
+    const code = data?.code;
+    const errors = data?.errors;
+
+    throw new AuthApiError(status, detail, code, errors);
+  }
+);
+

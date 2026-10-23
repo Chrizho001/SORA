@@ -4,6 +4,7 @@ import { site } from "@/content/site";
 import { MotionProvider } from "@/components/ui/MotionProvider";
 import { ToastProvider } from "@/components/auth/ToastProvider";
 import { AuthProvider } from "@/lib/auth-context";
+import { QueryProvider } from "@/lib/query-provider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -43,9 +44,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${spaceGrotesk.variable} ${abel.variable} antialiased`}>
       <body className="min-h-dvh">
         <MotionProvider>
-          <AuthProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </AuthProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </AuthProvider>
+          </QueryProvider>
         </MotionProvider>
       </body>
     </html>
