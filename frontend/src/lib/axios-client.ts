@@ -37,7 +37,94 @@ export const getStoredAccessToken = (): string | null => {
 };
 
 /**
-  * Configured Axios instance for SORA Authentication
+ * Extracts a human-friendly, informative error message from any API error.
+ * Ensures no errors fail silently or leave the user guessing.
+ */
+export function formatApiErrorMessage(error: unknown): string {
+  if (!error) return "An unexpected error occurred. Please try again.";
+
+  // Handle AuthApiError
+  if (error instanceof AuthApiError) {
+    if (error.errors && typeof error.errors === "object") {
+      const fieldMsgs = Object.entries(error.errors)
+        .map(([field, msgs]) => {
+          const joined = Array.isArray(msgs) ? msgs.join(" ") : String(msgs);
+          return field === "non_field_errors" || field === "detail" ? joined : `${field}: ${joined}`;
+        })
+        .filter(Boolean);
+      if (fieldMsgs.length > 0) return fieldMsgs.join(" | ");
+    }
+    return error.message;
+  }
+
+  // Handle AxiosError
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (typeof data === "string" && data.trim()) {
+      return data;
+    }
+    if (data && typeof data === "object") {
+      const record = data as Record<string, unknown>;
+      if (record.detail && typeof record.detail === "string") return record.detail;
+      if (record.error && typeof record.error === "string") return record.error;
+      if (record.message && typeof record.message === "string") return record.message;
+      if (record.errors && typeof record.errors === "object") {
+        const fieldMsgs = Object.entries(record.errors as Record<string, unknown>)
+          .map(([field, msgs]) => {
+            const joined = Array.isArray(msgs) ? (msgs as string[]).join(" ") : String(msgs);
+            return field === "non_field_errors" || field === "detail" ? joined : `${field}: ${joined}`;
+          })
+          .filter(Boolean);
+        if (fieldMsgs.length > 0) return fieldMsgs.join(" | ");
+      }
+      // Direct DRF field errors dictionary (e.g. { file: ["Only PDF allowed."] })
+      const entries = Object.entries(record);
+      if (entries.length > 0) {
+        const fieldMsgs = entries
+          .map(([field, msgs]) => {
+            const joined = Array.isArray(msgs)
+              ? msgs.join(" ")
+              : typeof msgs === "string"
+              ? msgs
+              : JSON.stringify(msgs);
+            return field === "non_field_errors" || field === "detail" ? joined : `${field}: ${joined}`;
+          })
+          .filter(Boolean);
+        if (fieldMsgs.length > 0) return fieldMsgs.join(" | ");
+      }
+    }
+
+    // Status code fallbacks
+    const status = error.response?.status;
+    if (status === 400) return "Invalid request. Please check your document and inputs.";
+    if (status === 401) return "Your session has expired. Please sign in again.";
+    if (status === 403) return "You do not have permission to perform this action.";
+    if (status === 404) return "The requested study resource could not be found.";
+    if (status === 413) return "File exceeds maximum size limit (10MB). Please choose a smaller PDF.";
+    if (status === 429) return "AI rate limit reached. Please wait a moment and try again.";
+    if (status === 500) return "Internal server error. Please try again shortly.";
+    if (status === 502 || status === 503 || status === 504) {
+      return "The study server is temporarily unavailable. Please try again in a moment.";
+    }
+
+    if (error.message?.includes("Network Error")) {
+      return "Unable to connect to the study server. Please check your connection.";
+    }
+    if (error.message?.includes("timeout")) {
+      return "The request timed out. Please try again.";
+    }
+    return error.message || "An unexpected error occurred.";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "An unexpected error occurred. Please try again.";
+}
+
+/**
+ * Configured Axios instance for SORA Authentication
  * - withCredentials: true ensures HttpOnly refresh cookies are transmitted across origins
  * - X-Requested-With: XMLHttpRequest triggers Django CSRF protections for cookie endpoints
  */
@@ -75,10 +162,7 @@ authClient.interceptors.response.use(
     }
 
     const { status, data } = error.response;
-    const detail =
-      data?.detail ||
-      (typeof data === "string" ? data : error.message) ||
-      "An unexpected error occurred.";
+    const detail = formatApiErrorMessage(error);
     const code = data?.code;
     const errors = data?.errors;
 
@@ -123,15 +207,28 @@ apiClient.interceptors.response.use(
       );
     }
 
-    const { status, data } = error.response;
-    const detail =
-      data?.detail ||
-      (typeof data === "string" ? data : error.message) ||
-      "An unexpected error occurred.";
+    const { status, data, config } = error.response;
+
+    // Handle token refresh on 401 for authenticated endpoints
+    const originalRequest = config as InternalAxiosRequestConfig & { _retry?: boolean };
+    if (status === 401 && !originalRequest._retry && inMemoryAccessToken) {
+      originalRequest._retry = true;
+      try {
+        const refreshRes = await authClient.post<{ access: string }>("/token/refresh/");
+        const newAccess = refreshRes.data.access;
+        setStoredAccessToken(newAccess);
+        originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+        return apiClient(originalRequest);
+      } catch {
+        setStoredAccessToken(null);
+        throw new AuthApiError(401, "Your session has expired. Please sign in again.", "token_expired");
+      }
+    }
+
+    const detail = formatApiErrorMessage(error);
     const code = data?.code;
     const errors = data?.errors;
 
     throw new AuthApiError(status, detail, code, errors);
   }
 );
-

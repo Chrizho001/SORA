@@ -104,3 +104,17 @@ class TestDocumentAPI:
         res = auth_client.delete(url)
         assert res.status_code == status.HTTP_204_NO_CONTENT
         assert not Document.objects.filter(id=doc.id).exists()
+
+    @patch("apps.documents.tasks.process_document.delay")
+    def test_retry_failed_document(self, mock_process, auth_client, user):
+        doc = Document.objects.create(
+            user=user, original_name="failed.pdf", size=100,
+            status=Document.Status.FAILED, error_message="Previous error"
+        )
+        url = reverse("documents:document-retry", args=[doc.id])
+        res = auth_client.post(url)
+        assert res.status_code == status.HTTP_202_ACCEPTED
+        doc.refresh_from_db()
+        assert doc.status == Document.Status.PROCESSING
+        assert doc.error_message == ""
+        mock_process.assert_called_once_with(str(doc.id))

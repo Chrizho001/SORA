@@ -8,8 +8,10 @@ import {
   XCircle,
   Trophy,
   BookOpen,
+  AlertCircle,
 } from "lucide-react";
 import { DocumentItem, QuizSession } from "@/lib/dashboard-api";
+import { formatApiErrorMessage } from "@/lib/axios-client";
 import { MascotGuide } from "../MascotGuide";
 
 interface QuizzesViewProps {
@@ -34,13 +36,17 @@ export function QuizzesView({
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleStartNewQuiz = async (docId: string) => {
     setIsStarting(true);
+    setError(null);
     try {
       const session = await onStartQuiz(docId);
       setActiveSession(session);
       setSelectedAnswers({});
+    } catch (err: unknown) {
+      setError(formatApiErrorMessage(err));
     } finally {
       setIsStarting(false);
     }
@@ -57,6 +63,7 @@ export function QuizzesView({
   const handleSubmit = async () => {
     if (!activeSession) return;
     setIsSubmitting(true);
+    setError(null);
     try {
       const answersPayload = Object.entries(selectedAnswers).map(([qid, choice]) => ({
         question_id: qid,
@@ -64,6 +71,8 @@ export function QuizzesView({
       }));
       const updatedSession = await onSubmitQuiz(activeSession.id, answersPayload);
       setActiveSession(updatedSession);
+    } catch (err: unknown) {
+      setError(formatApiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -92,6 +101,24 @@ export function QuizzesView({
           if (readyDoc) handleStartNewQuiz(readyDoc.id);
         }}
       />
+
+      {/* Error Alert Box */}
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in duration-200">
+          <AlertCircle className="size-4 shrink-0 text-rose-600 mt-0.5" />
+          <div className="flex-1 space-y-0.5">
+            <p className="font-display font-semibold text-rose-900">Quiz Notice</p>
+            <p className="text-rose-700 leading-relaxed font-body">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-rose-400 hover:text-rose-700 font-display font-medium text-xs"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Active Quiz Runner if a quiz is in progress */}
       {activeSession ? (

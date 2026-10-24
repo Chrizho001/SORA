@@ -65,7 +65,17 @@ def generate_flashcards_task(document_id: str):
             data={"document_id": str(document.id)},
         )
 
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to generate flashcards for document_id=%s", document_id)
         document.flashcard_generation_status = Document.FlashcardGenerationStatus.FAILED
         document.save(update_fields=["flashcard_generation_status"])
+        try:
+            NotificationService.notify(
+                recipient=document.user,
+                notification_type=NotificationType.PDF_SUMMARY_FAILED,
+                title="Flashcards Failed",
+                body=f"Failed to generate flashcards for '{document.original_name}': {str(e)}",
+                data={"document_id": str(document.id), "error": str(e)},
+            )
+        except Exception:
+            pass

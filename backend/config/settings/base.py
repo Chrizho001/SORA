@@ -306,8 +306,13 @@ VAPID_CLAIM_EMAIL = env("VAPID_CLAIM_EMAIL", default="")
 # ──────────────────────────────────────────────
 # AI API
 # ──────────────────────────────────────────────
-AI_PROVIDER = env("AI_PROVIDER", default="mock")
+AI_PROVIDER = env("AI_PROVIDER", default="gemini")
 AI_API_KEY = env("AI_API_KEY", default="")
+AI_BASE_URL = env(
+    "AI_BASE_URL", default="https://generativelanguage.googleapis.com/v1beta/models"
+)
+AI_MODEL_NAME = env("AI_MODEL_NAME", default="gemini-3.5-flash")
+AI_MAX_PROMPT_CHARS = env.int("AI_MAX_PROMPT_CHARS", default=500000)
 
 # ──────────────────────────────────────────────
 # Media (Uploads)

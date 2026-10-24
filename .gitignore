@@ -1,4 +1,6 @@
-# Python
+# ==========================================
+# Python & Django
+# ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -7,47 +9,74 @@ __pycache__/
 *.egg
 dist/
 build/
+*.sqlite3
+staticfiles/
+media/
+logs/
+*.log
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
 env/
 
-# Environment variables (real values — never committed)
-.env
+# Coverage & testing
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+.pytest_cache/
+.ruff_cache/
 
-# IDE
+# ==========================================
+# Node.js & Next.js
+# ==========================================
+node_modules/
+.next/
+out/
+.pnp
+.pnp.*
+yarn-debug.log*
+yarn-error.log*
+npm-debug.log*
+.pnpm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# ==========================================
+# Environment Variables & Secrets (CRITICAL)
+# ==========================================
+.env
+.env.*
+.env*.local
+*.env
+*.env.local
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+frontend/.env.*.local
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# ==========================================
+# IDE & System
+# ==========================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Django
-*.sqlite3
-staticfiles/
-media/
-
-# Coverage
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-
-# pytest
-.pytest_cache/
-
-# ruff
-.ruff_cache/
 
 # Docker volumes
 pgdata/
 
-# Docs & Design
+# Documentation & Design references
 docs/
 design/
 DESIGN.md

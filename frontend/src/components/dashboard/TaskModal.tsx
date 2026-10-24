@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { X, Calendar as CalendarIcon, Clock, AlertTriangle, Check } from "lucide-react";
 import { CreateTaskPayload } from "@/lib/dashboard-api";
 import { SoraMascot } from "@/components/auth/SoraMascot";
+import { formatApiErrorMessage } from "@/lib/axios-client";
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
       setDescription("");
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create task");
+      setError(formatApiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

@@ -8,8 +8,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import { SoraMascot } from "@/components/auth/SoraMascot";
+import { formatApiErrorMessage } from "@/lib/axios-client";
 
 interface DocumentUploadModalProps {
   isOpen: boolean;
@@ -35,13 +37,14 @@ export function DocumentUploadModal({
 
     // Validate PDF type
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setError("Only PDF files are supported (e.g. lecture_01.pdf).");
+      setError("Only PDF files are supported (.pdf). Please choose a valid lecture slide deck, reading guide, or notes.");
       return;
     }
 
     // Validate size (10 MB max)
     if (file.size > 10 * 1024 * 1024) {
-      setError("File exceeds the 10MB size limit. Please upload a smaller PDF.");
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+      setError(`This file is ${sizeMb}MB, which exceeds the 10MB limit. Please compress or split the document.`);
       return;
     }
 
@@ -73,7 +76,7 @@ export function DocumentUploadModal({
 
   const handleUploadSubmit = async () => {
     if (!selectedFile) {
-      setError("Please select a PDF file first.");
+      setError("Please select a PDF file first before starting analysis.");
       return;
     }
 
@@ -83,9 +86,10 @@ export function DocumentUploadModal({
     try {
       await onUpload(selectedFile);
       setSelectedFile(null);
+      setError(null);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to upload document");
+      setError(formatApiErrorMessage(err));
     } finally {
       setIsUploading(false);
     }
@@ -103,7 +107,7 @@ export function DocumentUploadModal({
             <div>
               <h3 className="font-display font-bold text-lg text-ink">Upload Lecture PDF</h3>
               <p className="text-xs text-muted font-body">
-                Turn your course document into summaries, flashcards, and quizzes
+                Multimodal AI analysis for lecture slides, notes, diagrams, and readings
               </p>
             </div>
           </div>
@@ -128,18 +132,29 @@ export function DocumentUploadModal({
           <div className="space-y-0.5 text-xs font-body text-ink-2">
             <p className="font-semibold text-ink flex items-center gap-1">
               <Sparkles className="size-3 text-amber-500" />
-              <span>SORA AI Processing</span>
+              <span>SORA Multimodal AI</span>
             </p>
             <p className="text-muted">
-              Drop lecture slides, chapter readings, or exam notes. I&apos;ll read every page!
+              I can read slides with charts, math formulas, scanned textbook pages, and lecture diagrams!
             </p>
           </div>
         </div>
 
+        {/* Error Alert Box */}
         {error && (
-          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0" />
-            <span>{error}</span>
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in duration-200">
+            <AlertCircle className="size-4 shrink-0 text-rose-600 mt-0.5" />
+            <div className="flex-1 space-y-1">
+              <p className="font-display font-semibold text-rose-900">Upload Issue</p>
+              <p className="text-rose-700 leading-relaxed font-body">{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-rose-400 hover:text-rose-700 text-xs font-display font-medium"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
@@ -177,7 +192,7 @@ export function DocumentUploadModal({
                 {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • PDF Document
               </p>
               <span className="text-[0.6875rem] text-emerald-700 font-display font-medium underline">
-                Click to change file
+                Click or drag to change file
               </span>
             </div>
           ) : (
@@ -194,30 +209,48 @@ export function DocumentUploadModal({
                 </p>
               </div>
               <span className="inline-flex items-center px-3 py-1 rounded-full bg-canvas text-[0.6875rem] font-display font-medium text-muted border border-line">
-                Standard PDF only
+                Standard & scanned PDFs supported
               </span>
             </>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-2 flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isUploading}
-            className="px-4 py-2.5 rounded-xl border border-line text-xs font-display font-semibold text-muted hover:text-ink hover:bg-mist transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleUploadSubmit}
-            disabled={!selectedFile || isUploading}
-            className="px-5 py-2.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-md transition-transform active:scale-95 disabled:opacity-40"
-          >
-            {isUploading ? "Uploading & Analyzing..." : "Start AI Summary"}
-          </button>
+        <div className="pt-2 flex items-center justify-between">
+          {error && selectedFile ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedFile(null);
+                setError(null);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink font-display"
+            >
+              <RotateCcw className="size-3.5" />
+              <span>Choose different file</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isUploading}
+              className="px-4 py-2.5 rounded-xl border border-line text-xs font-display font-semibold text-muted hover:text-ink hover:bg-mist transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleUploadSubmit}
+              disabled={!selectedFile || isUploading}
+              className="px-5 py-2.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-md transition-transform active:scale-95 disabled:opacity-40"
+            >
+              {isUploading ? "Uploading & Analyzing..." : "Start AI Summary"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

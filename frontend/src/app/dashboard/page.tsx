@@ -20,6 +20,7 @@ import { SettingsView } from "@/components/dashboard/views/SettingsView";
 import {
   useDocuments,
   useUploadDocument,
+  useRetryDocument,
   useGenerateFlashcards,
   useDeleteDocument,
   useFlashcards,
@@ -66,6 +67,7 @@ export default function DashboardPage() {
 
   // Mutations
   const uploadDocMutation = useUploadDocument();
+  const retryDocMutation = useRetryDocument();
   const generateCardsMutation = useGenerateFlashcards();
   const deleteDocMutation = useDeleteDocument();
   const startQuizMutation = useStartQuiz();
@@ -166,6 +168,7 @@ export default function DashboardPage() {
               }}
               onViewDocument={() => setActiveTab("documents")}
               onNavigateTab={setActiveTab}
+              onRetryDocument={(docId) => retryDocMutation.mutate(docId)}
             />
           )}
 
@@ -179,6 +182,7 @@ export default function DashboardPage() {
                 setActiveTab("quizzes");
               }}
               onDeleteDocument={(docId) => deleteDocMutation.mutate(docId)}
+              onRetryDocument={(docId) => retryDocMutation.mutate(docId)}
             />
           )}
 

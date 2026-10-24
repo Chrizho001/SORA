@@ -11,6 +11,7 @@ import {
   CreateTaskPayload,
   TaskQueryParams,
 } from "./dashboard-api";
+import { formatApiErrorMessage } from "./axios-client";
 import { notify } from "@/components/auth/ToastProvider";
 
 // ==========================================
@@ -22,7 +23,7 @@ export function useDocuments() {
     queryKey: ["documents"],
     queryFn: () => documentsApi.getDocuments(),
     refetchInterval: (query) => {
-      // Auto-poll every 5 seconds if any document is currently PROCESSING or GENERATING
+      // Auto-poll every 4 seconds if any document is currently PROCESSING, UPLOADED, or GENERATING flashcards
       const data = query.state.data;
       if (Array.isArray(data)) {
         const hasActiveJobs = data.some(
@@ -31,7 +32,7 @@ export function useDocuments() {
             doc.status === "UPLOADED" ||
             doc.flashcard_generation_status === "GENERATING"
         );
-        if (hasActiveJobs) return 5000;
+        if (hasActiveJobs) return 4000;
       }
       return false;
     },
@@ -45,12 +46,28 @@ export function useUploadDocument() {
     onSuccess: (newDoc) => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       notify.success(
-        `"${newDoc.original_name}" uploaded! SORA AI is analyzing your document.`,
+        `"${newDoc.original_name}" uploaded successfully! SORA AI is reading your document.`,
         "Upload Started"
       );
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to upload document", "Upload Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Upload Failed");
+    },
+  });
+}
+
+export function useRetryDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: string) => documentsApi.retryDocument(documentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      notify.info("SORA AI is re-analyzing your document with AI vision.", "Analysis Restarted");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Retry Failed");
     },
   });
 }
@@ -63,12 +80,13 @@ export function useGenerateFlashcards() {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       queryClient.invalidateQueries({ queryKey: ["flashcards"] });
       notify.success(
-        "SORA AI is generating flashcards from your summary!",
+        "SORA AI is generating smart flashcards from your summary!",
         "Flashcards Queued"
       );
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to trigger flashcard generation", "Generation Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Flashcard Generation Failed");
     },
   });
 }
@@ -79,10 +97,13 @@ export function useDeleteDocument() {
     mutationFn: (id: string) => documentsApi.deleteDocument(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      notify.info("Document deleted from your library.", "Document Removed");
+      queryClient.invalidateQueries({ queryKey: ["flashcards"] });
+      queryClient.invalidateQueries({ queryKey: ["quiz-sessions"] });
+      notify.info("Document and associated materials deleted.", "Document Removed");
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to delete document", "Delete Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Delete Failed");
     },
   });
 }
@@ -118,8 +139,9 @@ export function useStartQuiz() {
       queryClient.invalidateQueries({ queryKey: ["quiz-sessions"] });
       notify.success("Speed quiz initialized! Good luck!", "Quiz Ready");
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to start quiz session", "Quiz Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Unable to Start Quiz");
     },
   });
 }
@@ -141,8 +163,9 @@ export function useSubmitQuiz() {
         "Quiz Submitted"
       );
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to submit quiz answers", "Submission Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Submission Failed");
     },
   });
 }
@@ -166,8 +189,9 @@ export function useCreateTask() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       notify.success("New study task scheduled!", "Task Created");
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to create task", "Task Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Task Creation Failed");
     },
   });
 }
@@ -180,8 +204,9 @@ export function useUpdateTask() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to update task", "Update Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Task Update Failed");
     },
   });
 }
@@ -194,8 +219,9 @@ export function useDeleteTask() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       notify.info("Task deleted.", "Task Removed");
     },
-    onError: (error: Error) => {
-      notify.error(error.message || "Failed to delete task", "Delete Error");
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Task Delete Failed");
     },
   });
 }
@@ -215,7 +241,7 @@ export function useUnreadNotificationCount() {
   return useQuery({
     queryKey: ["notifications", "unread-count"],
     queryFn: () => notificationsApi.getUnreadCount(),
-    refetchInterval: 30000, // Poll unread notifications count every 30 seconds
+    refetchInterval: 30000,
   });
 }
 
@@ -226,6 +252,10 @@ export function useMarkNotificationRead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Notification Error");
     },
   });
 }
@@ -238,6 +268,10 @@ export function useMarkAllNotificationsRead() {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
       notify.success("All notifications marked as read.", "Notifications Updated");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Notification Error");
     },
   });
 }

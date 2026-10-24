@@ -31,3 +31,7 @@ CACHES = {
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_URL = "memory://"
+
+# Force mock AI provider during tests
+AI_PROVIDER = "mock"
+AI_API_KEY = ""

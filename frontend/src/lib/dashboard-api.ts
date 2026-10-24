@@ -64,6 +64,11 @@ export const documentsApi = {
     const res = await apiClient.post<QuizSession>(`/documents/${documentId}/start-quiz/`);
     return res.data;
   },
+
+  async retryDocument(documentId: string): Promise<{ status: string }> {
+    const res = await apiClient.post<{ status: string }>(`/documents/${documentId}/retry/`);
+    return res.data;
+  },
 };
 
 // ==========================================

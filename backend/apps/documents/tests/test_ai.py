@@ -17,6 +17,9 @@ from apps.documents.tasks import process_document
 def test_prod_settings_refuses_mock_ai_provider(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "mock")
     monkeypatch.setenv("SECRET_KEY", "dummy-secret-key")
+    import config.settings.base
+
+    importlib.reload(config.settings.base)
     with pytest.raises(ImproperlyConfigured, match="AI_PROVIDER"):
         # Reload or import config.settings.prod
         if "config.settings.prod" in importlib.sys.modules:

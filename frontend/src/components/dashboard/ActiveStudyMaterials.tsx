@@ -8,8 +8,8 @@ import {
   Plus,
   Zap,
   Sparkles,
-  Loader2,
   AlertCircle,
+  RotateCw,
 } from "lucide-react";
 import { DocumentItem } from "@/lib/dashboard-api";
 
@@ -19,6 +19,7 @@ interface ActiveStudyMaterialsProps {
   onGenerateFlashcards: (docId: string) => void;
   onStartQuiz: (docId: string) => void;
   onViewDocument: (doc: DocumentItem) => void;
+  onRetryDocument?: (docId: string) => void;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export function ActiveStudyMaterials({
   onGenerateFlashcards,
   onStartQuiz,
   onViewDocument,
+  onRetryDocument,
   className = "",
 }: ActiveStudyMaterialsProps) {
   return (
@@ -82,6 +84,7 @@ export function ActiveStudyMaterials({
               const isSummaryDone = doc.status === "DONE";
               const isFlashcardsDone = doc.flashcard_generation_status === "DONE";
               const isFlashcardsGenerating = doc.flashcard_generation_status === "GENERATING";
+              const isFlashcardsFailed = doc.flashcard_generation_status === "FAILED";
               const isProcessing = doc.status === "PROCESSING" || doc.status === "UPLOADED";
               const isFailed = doc.status === "FAILED";
 
@@ -90,6 +93,7 @@ export function ActiveStudyMaterials({
               if (isProcessing) progressPercent = 40;
               if (isSummaryDone && !isFlashcardsDone) progressPercent = 70;
               if (isSummaryDone && isFlashcardsDone) progressPercent = 100;
+              if (isFailed) progressPercent = 0;
 
               return (
                 <div
@@ -98,9 +102,17 @@ export function ActiveStudyMaterials({
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Document Icon Avatar */}
-                    <div className="size-10 rounded-xl bg-surface border border-line flex items-center justify-center text-ink shrink-0 shadow-xs">
+                    <div
+                      className={`size-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+                        isFailed
+                          ? "bg-rose-50 border-rose-200"
+                          : isProcessing
+                          ? "bg-sky-50 border-sky-200"
+                          : "bg-emerald-50 border-emerald-200"
+                      }`}
+                    >
                       {isProcessing ? (
-                        <Loader2 className="size-5 text-sky-600 animate-spin" />
+                        <FileText className="size-5 text-sky-600 animate-pulse" />
                       ) : isFailed ? (
                         <AlertCircle className="size-5 text-rose-600" />
                       ) : (
@@ -109,7 +121,7 @@ export function ActiveStudyMaterials({
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <button
                           type="button"
                           onClick={() => onViewDocument(doc)}
@@ -118,7 +130,7 @@ export function ActiveStudyMaterials({
                           {doc.original_name}
                         </button>
 
-                        {/* Status Chip */}
+                        {/* Status Chips */}
                         {isProcessing && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[0.625rem] font-display font-semibold animate-pulse">
                             Processing PDF...
@@ -129,24 +141,52 @@ export function ActiveStudyMaterials({
                             AI Flashcards...
                           </span>
                         )}
+                        {isFailed && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[0.625rem] font-display font-semibold">
+                            Analysis Failed
+                          </span>
+                        )}
+                        {isFlashcardsFailed && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[0.625rem] font-display font-semibold">
+                            Flashcards Issue
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-3 text-[0.6875rem] text-muted font-body mt-0.5">
-                        <span>
-                          {doc.page_count ? `${doc.page_count} pages` : "Lecture Document"}
-                        </span>
-                        <span>•</span>
-                        <span>{(doc.size / (1024 * 1024)).toFixed(1)} MB</span>
-                        <span>•</span>
-                        <span>{new Date(doc.created_at).toLocaleDateString()}</span>
-                      </div>
+                      {isFailed ? (
+                        <p className="text-[0.6875rem] text-rose-600 font-body mt-0.5 line-clamp-1">
+                          {doc.error_message || "The AI model encountered an issue reading this PDF."}
+                        </p>
+                      ) : (
+                        <div className="flex items-center gap-3 text-[0.6875rem] text-muted font-body mt-0.5">
+                          <span>
+                            {doc.page_count ? `${doc.page_count} pages` : "Lecture Document"}
+                          </span>
+                          <span>•</span>
+                          <span>{(doc.size / (1024 * 1024)).toFixed(1)} MB</span>
+                          <span>•</span>
+                          <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions & Progress */}
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-line/60">
                     {/* Action buttons */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {isFailed && onRetryDocument && (
+                        <button
+                          type="button"
+                          onClick={() => onRetryDocument(doc.id)}
+                          className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-display font-semibold border border-rose-200 shadow-2xs transition-all hover:scale-105 active:scale-95 flex items-center gap-1"
+                          title="Retry AI analysis"
+                        >
+                          <RotateCw className="size-3 text-rose-600" />
+                          <span>Retry</span>
+                        </button>
+                      )}
+
                       {isSummaryDone && (
                         <button
                           type="button"
@@ -162,11 +202,19 @@ export function ActiveStudyMaterials({
                         <button
                           type="button"
                           onClick={() => onGenerateFlashcards(doc.id)}
-                          className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-display font-semibold border border-purple-200 shadow-2xs transition-colors flex items-center gap-1"
-                          title="Generate smart flashcards"
+                          className={`px-2.5 py-1 rounded-lg text-xs font-display font-semibold shadow-2xs transition-colors flex items-center gap-1 ${
+                            isFlashcardsFailed
+                              ? "bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300"
+                              : "bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200"
+                          }`}
+                          title={isFlashcardsFailed ? "Retry generating flashcards" : "Generate smart flashcards"}
                         >
-                          <Brain className="size-3 text-purple-600" />
-                          <span>Flashcards</span>
+                          {isFlashcardsFailed ? (
+                            <RotateCw className="size-3 text-amber-700" />
+                          ) : (
+                            <Brain className="size-3 text-purple-600" />
+                          )}
+                          <span>{isFlashcardsFailed ? "Retry Cards" : "Flashcards"}</span>
                         </button>
                       )}
 
@@ -183,36 +231,23 @@ export function ActiveStudyMaterials({
                       )}
                     </div>
 
-                    {/* Circular Progress Ring */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative size-9 flex items-center justify-center">
-                        <svg className="size-full -rotate-90" viewBox="0 0 36 36">
-                          <path
-                            className="text-line"
-                            strokeWidth="3.5"
-                            stroke="currentColor"
-                            fill="none"
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          />
-                          <path
-                            className={
-                              progressPercent === 100
-                                ? "text-emerald-500"
-                                : progressPercent > 50
-                                ? "text-[#c8f560]"
-                                : "text-sky-500"
-                            }
-                            strokeDasharray={`${progressPercent}, 100`}
-                            strokeLinecap="round"
-                            strokeWidth="3.5"
-                            stroke="currentColor"
-                            fill="none"
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          />
-                        </svg>
-                        <span className="absolute text-[0.625rem] font-display font-bold text-ink">
-                          {progressPercent}%
-                        </span>
+                    {/* Progress Indicator */}
+                    <div className="w-16 hidden md:block">
+                      <div className="flex items-center justify-between text-[0.625rem] font-display text-muted mb-1">
+                        <span>Progress</span>
+                        <span>{progressPercent}%</span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-mist overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isFailed
+                              ? "bg-rose-500"
+                              : progressPercent === 100
+                              ? "bg-emerald-500"
+                              : "bg-[#c8f560]"
+                          }`}
+                          style={{ width: `${progressPercent}%` }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -223,13 +258,19 @@ export function ActiveStudyMaterials({
         )}
       </div>
 
-      {/* Footer Info */}
+      {/* Footer Banner */}
       <div className="mt-4 pt-3 border-t border-line flex items-center justify-between text-xs font-body text-muted">
-        <span>Click on any document to view its AI summary & study tools.</span>
-        <span className="text-emerald-700 font-display font-semibold flex items-center gap-1">
-          <Sparkles className="size-3" />
-          <span>Celery Powered</span>
+        <span className="flex items-center gap-1 text-[0.6875rem]">
+          <Sparkles className="size-3 text-amber-500" />
+          <span>Multimodal AI Vision & Flashcard Engine Active</span>
         </span>
+        <button
+          type="button"
+          onClick={() => onViewDocument(documents[0] || ({} as DocumentItem))}
+          className="font-display font-semibold text-ink hover:underline text-[0.6875rem]"
+        >
+          View Library →
+        </button>
       </div>
     </div>
   );

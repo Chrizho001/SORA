@@ -104,3 +104,24 @@ class DocumentViewSet(viewsets.ModelViewSet):
         session = start_quiz(user=request.user, document=document)
         serializer = QuizSessionSerializer(session)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="retry")
+    def retry(self, request, pk=None):
+        document = self.get_object()
+        if document.status == Document.Status.PROCESSING:
+            return Response(
+                {"detail": "Document is already being analyzed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        document.status = Document.Status.PROCESSING
+        document.error_message = ""
+        document.save(update_fields=["status", "error_message"])
+
+        from apps.documents.tasks import process_document
+
+        process_document.delay(str(document.id))
+        return Response(
+            {"status": "Retrying document analysis..."},
+            status=status.HTTP_202_ACCEPTED,
+        )

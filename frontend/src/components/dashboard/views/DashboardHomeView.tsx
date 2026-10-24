@@ -35,6 +35,7 @@ interface DashboardHomeViewProps {
   onStartQuiz: (docId: string) => void;
   onViewDocument: (doc: DocumentItem) => void;
   onNavigateTab: (tab: DashboardTab) => void;
+  onRetryDocument?: (docId: string) => void;
 }
 
 export function DashboardHomeView({
@@ -51,6 +52,7 @@ export function DashboardHomeView({
   onStartQuiz,
   onViewDocument,
   onNavigateTab,
+  onRetryDocument,
 }: DashboardHomeViewProps) {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -284,6 +286,7 @@ export function DashboardHomeView({
             onGenerateFlashcards={onGenerateFlashcards}
             onStartQuiz={onStartQuiz}
             onViewDocument={onViewDocument}
+            onRetryDocument={onRetryDocument}
             className="h-full"
           />
         </div>

@@ -9,6 +9,7 @@ import {
   Sparkles,
   Shuffle,
   BookOpen,
+  AlertCircle,
 } from "lucide-react";
 import { DocumentItem, FlashcardItem } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
@@ -96,6 +97,32 @@ export function FlashcardsView({
         actionLabel="Review Deck"
         onActionClick={() => setIsFlipped(!isFlipped)}
       />
+
+      {/* Notice if any document failed flashcard generation */}
+      {documents.some((d) => d.flashcard_generation_status === "FAILED") && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="size-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-display font-semibold">Flashcard Generation Notice</p>
+              <p className="text-amber-700">
+                1 or more documents encountered a limit or timeout during flashcard generation.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const target = documents.find((d) => d.flashcard_generation_status === "FAILED");
+              if (target) onGenerateFlashcards(target.id);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-950 font-display font-bold self-start sm:self-auto shrink-0 transition-colors"
+          >
+            <RotateCw className="size-3.5" />
+            <span>Retry Generating Cards</span>
+          </button>
+        </div>
+      )}
 
       {/* Main Flashcard Practice Area */}
       {activeDeck.length === 0 ? (

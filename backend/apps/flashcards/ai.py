@@ -93,9 +93,16 @@ class FlashcardGeneratorClient:
     AI interface for generating flashcards using OpenAI.
     """
 
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, base_url=None, model_name=None):
         self.api_key = api_key or getattr(settings, "AI_API_KEY", None)
-        self.model_name = "gpt-4o-mini"
+        self.base_url = base_url or getattr(
+            settings,
+            "AI_BASE_URL",
+            "https://api.groq.com/openai/v1/chat/completions",
+        )
+        self.model_name = model_name or getattr(
+            settings, "AI_MODEL_NAME", "openai/gpt-oss-120b"
+        )
 
     def generate(self, summary_text: str) -> list[dict]:
         if not self.api_key:
@@ -103,24 +110,38 @@ class FlashcardGeneratorClient:
 
         system_prompt = (
             "You are a study assistant. Generate exactly 5 flashcards from the text. "
-            "Return ONLY a JSON list of objects with 'question' and 'answer' string properties."
+            "Return a JSON object with a 'flashcards' key containing a list of objects with 'question' and 'answer' string properties."
         )
 
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            json={
-                "model": self.model_name,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": summary_text},
-                ],
-                "response_format": {"type": "json_object"},
-            },
-            timeout=120,
-        )
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
+        try:
+            response = requests.post(
+                self.base_url,
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "model": self.model_name,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": summary_text},
+                    ],
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=120,
+            )
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+        except requests.exceptions.HTTPError as exc:
+            if exc.response is not None:
+                if exc.response.status_code == 413:
+                    raise DocumentProcessingError(
+                        "Summary exceeds AI provider token limits for flashcard generation."
+                    ) from exc
+                if exc.response.status_code == 429:
+                    raise DocumentProcessingError(
+                        "AI rate limit reached. Please wait a moment and try again."
+                    ) from exc
+            raise DocumentProcessingError(f"AI flashcard generation error: {exc}") from exc
+        except requests.exceptions.RequestException as exc:
+            raise DocumentProcessingError(f"Network error contacting AI service: {exc}") from exc
 
         try:
             parsed = json.loads(content)
@@ -130,8 +151,107 @@ class FlashcardGeneratorClient:
         return validate_flashcards_data(parsed)
 
 
+class GeminiFlashcardGeneratorClient:
+    """
+    Interface for generating flashcards using Google Gemini.
+    """
+
+    def __init__(self, api_key=None, base_url=None, model_name=None):
+        self.api_key = api_key or getattr(settings, "AI_API_KEY", "")
+        self.base_url = base_url or getattr(
+            settings,
+            "AI_BASE_URL",
+            "https://generativelanguage.googleapis.com/v1beta/models",
+        )
+        self.model_name = model_name or getattr(
+            settings, "AI_MODEL_NAME", "gemini-3.5-flash"
+        )
+
+    def generate(self, summary_text: str) -> list[dict]:
+        if not self.api_key:
+            raise DocumentProcessingError("Gemini API key is not configured in settings.")
+
+        endpoint = f"{self.base_url.rstrip('/')}/{self.model_name}:generateContent"
+
+        prompt = (
+            "You are an expert academic tutor. Generate exactly 5 high-yield study flashcards from the text below. "
+            "Return a JSON object with a 'flashcards' key containing a list of objects with 'question' and 'answer' string properties.\n\n"
+            f"{summary_text}"
+        )
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"},
+        }
+        headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
+
+        import time
+
+        max_attempts = 4
+        last_error = None
+        for attempt in range(max_attempts):
+            try:
+                response = requests.post(endpoint, headers=headers, json=payload, timeout=90)
+                if response.status_code == 200:
+                    data = response.json()
+                    candidates = data.get("candidates", [])
+                    if not candidates:
+                        raise DocumentProcessingError("Gemini returned an empty candidate list.")
+                    content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    try:
+                        parsed = json.loads(content)
+                    except json.JSONDecodeError as exc:
+                        raise DocumentProcessingError("Failed to parse Gemini output as JSON.") from exc
+                    return validate_flashcards_data(parsed)
+
+                if response.status_code in (503, 429) and attempt < max_attempts - 1:
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+
+                response.raise_for_status()
+
+            except requests.exceptions.HTTPError as exc:
+                last_error = exc
+                status_code = exc.response.status_code if exc.response is not None else 0
+                error_body = exc.response.text if exc.response is not None else str(exc)
+                try:
+                    err_json = exc.response.json()
+                    err_msg = err_json.get("error", {}).get("message", error_body)
+                except Exception:
+                    err_msg = error_body
+
+                if status_code in (401, 403):
+                    raise DocumentProcessingError(
+                        f"Google Gemini authentication failed: {err_msg}"
+                    ) from exc
+                if status_code == 429:
+                    raise DocumentProcessingError(
+                        "Google Gemini rate limit reached. Please wait a moment and try again."
+                    ) from exc
+                if status_code == 503:
+                    raise DocumentProcessingError(
+                        "Google Gemini is currently experiencing temporary high traffic. Please try again shortly."
+                    ) from exc
+                raise DocumentProcessingError(
+                    f"Google Gemini API error ({status_code}): {err_msg}"
+                ) from exc
+
+            except requests.exceptions.RequestException as exc:
+                last_error = exc
+                if attempt < max_attempts - 1:
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+                raise DocumentProcessingError(
+                    f"Network error communicating with Google Gemini: {exc}"
+                ) from exc
+
+        raise DocumentProcessingError(f"Failed to generate flashcards with Gemini: {last_error}")
+
+
 def get_flashcard_generator():
     provider = getattr(settings, "AI_PROVIDER", "mock")
     if provider == "mock":
         return MockFlashcardGenerator()
+    if provider == "gemini":
+        return GeminiFlashcardGeneratorClient()
     return FlashcardGeneratorClient()
