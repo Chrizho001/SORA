@@ -522,7 +522,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `account_conflict` with a clear message.
   - **Prompt:** P-17
 
-- [ ] **FE-13 · P1 · Timezone bugs in task date handling**
+- [x] **FE-13 · P1 · Timezone bugs in task date handling**
   - **Where:** `MiniCalendar.tsx`, `AssignmentsBoard.tsx` and `TasksView.tsx` (`due_at.split("T")[0]`);
     `TaskModal.tsx` (default date from `toISOString()`).
   - **Acceptable solution:** a `src/lib/dates.ts` with `toLocalDateKey(iso)` and `localDayRange(date)`.
@@ -541,7 +541,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     (`PushManager.subscribe` with `NEXT_PUBLIC_VAPID_PUBLIC_KEY`) and POSTs to `/push-subscriptions/`.
   - **Prompt:** P-15
 
-- [ ] **FE-15 · P0 · Tasks can't be edited (SRS §3.2 "Edit task")**
+- [x] **FE-15 · P0 · Tasks can't be edited (SRS §3.2 "Edit task")**
   - **Where:** `TasksView.tsx`, `TaskModal.tsx` (create only).
   - **Acceptable solution:** `TaskModal` accepts an optional `task` and PATCHes it. The edit action is on
     every task row and calendar item.

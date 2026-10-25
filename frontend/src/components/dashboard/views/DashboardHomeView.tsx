@@ -35,6 +35,7 @@ interface DashboardHomeViewProps {
   onAddTaskClick: () => void;
   onToggleTask: (task: TaskItem) => void;
   onDeleteTask: (id: string) => void;
+  onEditTask?: (task: TaskItem) => void;
   onGenerateFlashcards: (docId: string) => void;
   onStartQuiz: (docId: string) => void;
   onViewDocument: (doc: DocumentItem) => void;
@@ -54,6 +55,7 @@ export function DashboardHomeView({
   onAddTaskClick,
   onToggleTask,
   onDeleteTask,
+  onEditTask,
   onGenerateFlashcards,
   onStartQuiz,
   onViewDocument,
@@ -316,6 +318,7 @@ export function DashboardHomeView({
             tasks={displayedTasks}
             onToggleTask={onToggleTask}
             onAddTaskClick={onAddTaskClick}
+            onEditTask={onEditTask}
             className="h-full"
           />
         </div>
@@ -354,6 +357,7 @@ export function DashboardHomeView({
             onToggleTask={onToggleTask}
             onDeleteTask={onDeleteTask}
             onAddTaskClick={onAddTaskClick}
+            onEditTask={onEditTask}
             selectedDateFilter={selectedCalendarDate}
             className="h-full"
           />

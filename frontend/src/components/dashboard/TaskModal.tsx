@@ -1,28 +1,43 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Calendar as CalendarIcon, Clock, AlertTriangle, Check } from "lucide-react";
-import { CreateTaskPayload } from "@/lib/dashboard-api";
+import { X, Calendar as CalendarIcon, Clock, AlertTriangle, Check, Pencil } from "lucide-react";
+import { CreateTaskPayload, TaskItem } from "@/lib/dashboard-api";
 import { SoraMascot } from "@/components/auth/SoraMascot";
 import { formatApiErrorMessage } from "@/lib/axios-client";
+import { toLocalInputs, fromLocalInput, toLocalDateKey } from "@/lib/dates";
 
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (task: CreateTaskPayload) => Promise<void>;
+  onUpdate?: (id: string, payload: Partial<CreateTaskPayload>) => Promise<void>;
   initialDate?: string | null;
+  task?: TaskItem | null;
 }
 
-export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(() => initialDate || new Date().toISOString().split("T")[0]);
-  const [time, setTime] = useState("18:00");
-  const [priority, setPriority] = useState<1 | 2 | 3>(2);
+function TaskModalDialog({
+  onClose,
+  onSubmit,
+  onUpdate,
+  initialDate,
+  task,
+}: TaskModalProps) {
+  const isEditMode = Boolean(task);
+
+  const [title, setTitle] = useState(() => (task ? task.title : ""));
+  const [description, setDescription] = useState(() => (task ? task.description || "" : ""));
+  const [date, setDate] = useState(() => {
+    if (task) return toLocalInputs(task.due_at).date;
+    return initialDate || toLocalDateKey(new Date());
+  });
+  const [time, setTime] = useState(() => {
+    if (task) return toLocalInputs(task.due_at).time;
+    return "18:00";
+  });
+  const [priority, setPriority] = useState<1 | 2 | 3>(() => (task ? task.priority : 2));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,21 +50,45 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
     setError(null);
 
     try {
-      let dueAt: string | null = null;
-      if (date) {
-        dueAt = new Date(`${date}T${time || "00:00"}:00`).toISOString();
+      const dueAt = date ? fromLocalInput(date, time) : null;
+
+      if (isEditMode && task) {
+        // PATCH only the changed fields
+        const payload: Partial<CreateTaskPayload> = {};
+        if (title.trim() !== task.title) {
+          payload.title = title.trim();
+        }
+        if (description.trim() !== (task.description || "")) {
+          payload.description = description.trim();
+        }
+        if (dueAt !== task.due_at) {
+          payload.due_at = dueAt;
+        }
+        if (priority !== task.priority) {
+          payload.priority = priority;
+        }
+
+        if (onUpdate) {
+          if (Object.keys(payload).length > 0) {
+            await onUpdate(task.id, payload);
+          }
+        } else {
+          await onSubmit({
+            title: title.trim(),
+            description: description.trim(),
+            due_at: dueAt,
+            priority,
+          });
+        }
+      } else {
+        await onSubmit({
+          title: title.trim(),
+          description: description.trim(),
+          due_at: dueAt,
+          priority,
+        });
       }
 
-      await onSubmit({
-        title: title.trim(),
-        description: description.trim(),
-        due_at: dueAt,
-        priority,
-      });
-
-      // Reset and close
-      setTitle("");
-      setDescription("");
       onClose();
     } catch (err: unknown) {
       setError(formatApiErrorMessage(err));
@@ -65,12 +104,16 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
         <div className="flex items-start justify-between pb-3 border-b border-line">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-2xl bg-[#c8f560] text-[#141413] flex items-center justify-center font-bold">
-              <CalendarIcon className="size-5" />
+              {isEditMode ? <Pencil className="size-5" /> : <CalendarIcon className="size-5" />}
             </div>
             <div>
-              <h3 className="font-display font-bold text-lg text-ink">Schedule Study Task</h3>
+              <h3 className="font-display font-bold text-lg text-ink">
+                {isEditMode ? "Edit task" : "Schedule Study Task"}
+              </h3>
               <p className="text-xs text-muted font-body">
-                Add an assignment deadline, quiz review, or study session
+                {isEditMode
+                  ? "Update task details, deadline, or priority"
+                  : "Add an assignment deadline, quiz review, or study session"}
               </p>
             </div>
           </div>
@@ -79,6 +122,7 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
             type="button"
             onClick={onClose}
             className="size-8 rounded-full text-muted hover:bg-mist hover:text-ink flex items-center justify-center transition-colors"
+            aria-label="Close modal"
           >
             <X className="size-4" />
           </button>
@@ -88,12 +132,14 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
         <div className="flex items-center gap-3 p-3 rounded-2xl bg-canvas border border-line">
           <SoraMascot
             size="sm"
-            emotion="happy"
+            emotion={isEditMode ? "focused" : "happy"}
             showSpeechBubble={false}
             className="scale-75 -my-4 -ml-2 shrink-0"
           />
           <p className="text-xs text-ink-2 font-body">
-            I&apos;ll keep track of this on your schedule and remind you before it is due!
+            {isEditMode
+              ? "Refining your goals keeps your schedule sharp and manageable!"
+              : "I'll keep track of this on your schedule and remind you before it is due!"}
           </p>
         </div>
 
@@ -138,16 +184,35 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
           {/* Date & Time Picker Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-display font-semibold text-ink mb-1 flex items-center gap-1.5">
-                <CalendarIcon className="size-3.5 text-muted" />
-                <span>Due Date</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-display font-semibold text-ink flex items-center gap-1.5">
+                  <CalendarIcon className="size-3.5 text-muted" />
+                  <span>Due Date</span>
+                </label>
+                {date && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDate("");
+                      setTime("");
+                    }}
+                    className="text-[0.6875rem] font-display text-muted hover:text-rose-600 transition-colors"
+                  >
+                    Clear deadline
+                  </button>
+                )}
+              </div>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full h-11 px-3 rounded-xl bg-surface border border-line text-xs font-display text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               />
+              {!date && (
+                <p className="text-[0.6875rem] text-muted font-body mt-1">
+                  No deadline (to-do without a deadline).
+                </p>
+              )}
             </div>
 
             <div>
@@ -159,7 +224,8 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl bg-surface border border-line text-xs font-display text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+                disabled={!date}
+                className="w-full h-11 px-3 rounded-xl bg-surface border border-line text-xs font-display text-ink focus:outline-none focus:ring-2 focus:ring-ink disabled:opacity-40"
               />
             </div>
           </div>
@@ -171,9 +237,9 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { level: 1 as const, name: "Low", color: "hover:border-blue-400 checked:bg-blue-50" },
-                { level: 2 as const, name: "Medium", color: "hover:border-amber-400 checked:bg-amber-50" },
-                { level: 3 as const, name: "High", color: "hover:border-rose-400 checked:bg-rose-50" },
+                { level: 1 as const, name: "Low" },
+                { level: 2 as const, name: "Medium" },
+                { level: 3 as const, name: "High" },
               ].map(({ level, name }) => (
                 <button
                   key={level}
@@ -211,11 +277,22 @@ export function TaskModal({ isOpen, onClose, onSubmit, initialDate }: TaskModalP
               disabled={isSubmitting}
               className="px-5 py-2.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-md transition-transform active:scale-95 disabled:opacity-50"
             >
-              {isSubmitting ? "Scheduling..." : "Save Task"}
+              {isSubmitting
+                ? isEditMode
+                  ? "Saving..."
+                  : "Scheduling..."
+                : isEditMode
+                ? "Save Changes"
+                : "Save Task"}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
+}
+
+export function TaskModal(props: TaskModalProps) {
+  if (!props.isOpen) return null;
+  return <TaskModalDialog key={props.task ? props.task.id : "new"} {...props} />;
 }

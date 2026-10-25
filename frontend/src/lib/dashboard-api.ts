@@ -1,4 +1,5 @@
 import { apiClient } from "./axios-client";
+import { userTimeZone } from "./dates";
 
 // ==========================================
 // DOCUMENTS TYPES & API
@@ -168,6 +169,7 @@ export interface TaskQueryParams {
   is_completed?: boolean;
   priority?: number;
   date?: string;
+  tz?: string;
   from?: string;
   to?: string;
 }
@@ -182,7 +184,11 @@ export interface CreateTaskPayload {
 
 export const tasksApi = {
   async getTasks(params?: TaskQueryParams): Promise<TaskItem[]> {
-    const res = await apiClient.get<TaskItem[] | { results: TaskItem[] }>("/tasks/", { params });
+    const finalParams = params ? { ...params } : undefined;
+    if (finalParams?.date && !finalParams.tz) {
+      finalParams.tz = userTimeZone();
+    }
+    const res = await apiClient.get<TaskItem[] | { results: TaskItem[] }>("/tasks/", { params: finalParams });
     if (Array.isArray(res.data)) return res.data;
     if ("results" in res.data && Array.isArray(res.data.results)) return res.data.results;
     return [];

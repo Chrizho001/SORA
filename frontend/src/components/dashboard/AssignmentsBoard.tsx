@@ -8,14 +8,17 @@ import {
   Trash2,
   Calendar,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 import { TaskItem } from "@/lib/dashboard-api";
+import { toLocalDateKey, isOverdue, isDueSoon } from "@/lib/dates";
 
 interface AssignmentsBoardProps {
   tasks: TaskItem[];
   onToggleTask: (task: TaskItem) => void;
   onDeleteTask: (id: string) => void;
   onAddTaskClick: () => void;
+  onEditTask?: (task: TaskItem) => void;
   selectedDateFilter?: string | null;
   className?: string;
 }
@@ -25,22 +28,29 @@ export function AssignmentsBoard({
   onToggleTask,
   onDeleteTask,
   onAddTaskClick,
+  onEditTask,
   selectedDateFilter,
   className = "",
 }: AssignmentsBoardProps) {
-  const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "completed" | "no-deadline">("all");
 
   const filteredTasks = tasks.filter((task) => {
-    // If a calendar date is selected, filter by that date
-    if (selectedDateFilter && task.due_at) {
-      const taskDate = task.due_at.split("T")[0];
+    // If a calendar date is selected, filter strictly by that date (tasks without deadline do NOT match)
+    if (selectedDateFilter) {
+      if (!task.due_at) return false;
+      const taskDate = toLocalDateKey(task.due_at);
       if (taskDate !== selectedDateFilter) return false;
     }
 
+    if (filter === "no-deadline") return !task.due_at;
     if (filter === "active") return !task.is_completed;
     if (filter === "completed") return task.is_completed;
     return true;
   });
+
+  // Separate tasks into scheduled and no-deadline for grouping when viewing all
+  const deadlineTasks = filteredTasks.filter((t) => Boolean(t.due_at));
+  const noDeadlineTasks = filteredTasks.filter((t) => !t.due_at);
 
   return (
     <div
@@ -70,11 +80,12 @@ export function AssignmentsBoard({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 mb-3.5">
+        <div className="flex flex-wrap items-center gap-1.5 mb-3.5">
           {[
             { id: "all" as const, label: "All Tasks" },
             { id: "active" as const, label: "In Progress" },
             { id: "completed" as const, label: "Completed" },
+            { id: "no-deadline" as const, label: "No Deadline" },
           ].map(({ id, label }) => (
             <button
               key={id}
@@ -107,98 +118,45 @@ export function AssignmentsBoard({
             </p>
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {filteredTasks.slice(0, 5).map((task) => {
-              const dueDate = task.due_at
-                ? new Date(task.due_at).toLocaleDateString([], {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "Flexible date";
+          <div className="space-y-4">
+            {/* Scheduled Tasks List */}
+            {deadlineTasks.length > 0 && (
+              <div className="space-y-2.5">
+                {deadlineTasks.slice(0, 6).map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    onToggleTask={onToggleTask}
+                    onDeleteTask={onDeleteTask}
+                    onEditTask={onEditTask}
+                  />
+                ))}
+              </div>
+            )}
 
-              // Determine status pill
-              const statusPill = task.is_completed
-                ? {
-                    label: "Completed",
-                    bg: "bg-[#dcfce7]",
-                    text: "text-[#16a34a]",
-                    border: "border-[#bbf7d0]",
-                  }
-                : task.due_at && new Date(task.due_at) < new Date()
-                ? {
-                    label: "Overdue",
-                    bg: "bg-rose-100",
-                    text: "text-rose-800",
-                    border: "border-rose-300",
-                  }
-                : {
-                    label: "In progress",
-                    bg: "bg-[#ede9fe]",
-                    text: "text-[#7c3aed]",
-                    border: "border-[#ddd6fe]",
-                  };
-
-              return (
-                <div
-                  key={task.id}
-                  className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 ${
-                    task.is_completed
-                      ? "bg-canvas/30 border-line/50 opacity-65"
-                      : "bg-surface hover:bg-canvas/40 border-line shadow-xs"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <button
-                      type="button"
-                      onClick={() => onToggleTask(task)}
-                      className="shrink-0 text-muted hover:text-emerald-600 transition-colors"
-                      title={task.is_completed ? "Mark incomplete" : "Mark completed"}
-                    >
-                      <CheckCircle2
-                        className={`size-5 ${
-                          task.is_completed ? "text-emerald-600" : "text-subtle"
-                        }`}
-                      />
-                    </button>
-
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`text-xs sm:text-sm font-display font-semibold truncate ${
-                          task.is_completed ? "line-through text-muted" : "text-ink"
-                        }`}
-                      >
-                        {task.title}
-                      </p>
-
-                      <div className="flex items-center gap-2 mt-0.5 text-[0.6875rem] text-muted font-body">
-                        <Clock className="size-3" />
-                        <span>{dueDate}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status pill & delete */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[0.6875rem] font-display font-semibold border ${statusPill.bg} ${statusPill.text} ${statusPill.border}`}
-                    >
-                      {statusPill.label}
+            {/* No Deadline Group */}
+            {noDeadlineTasks.length > 0 && filter !== "completed" && (
+              <div className="space-y-2 pt-2">
+                {!selectedDateFilter && deadlineTasks.length > 0 && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-line">
+                    <span className="text-[0.6875rem] font-display font-bold uppercase tracking-wider text-muted">
+                      No Deadline ({noDeadlineTasks.length})
                     </span>
-
-                    <button
-                      type="button"
-                      onClick={() => onDeleteTask(task.id)}
-                      className="p-1 rounded-lg text-subtle hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                      title="Delete task"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
                   </div>
+                )}
+                <div className="space-y-2.5">
+                  {noDeadlineTasks.slice(0, 4).map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onToggleTask={onToggleTask}
+                      onDeleteTask={onDeleteTask}
+                      onEditTask={onEditTask}
+                    />
+                  ))}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -210,6 +168,132 @@ export function AssignmentsBoard({
           <Sparkles className="size-3 text-amber-500" />
           <span>Syncs with Calendar</span>
         </span>
+      </div>
+    </div>
+  );
+}
+
+function TaskRow({
+  task,
+  onToggleTask,
+  onDeleteTask,
+  onEditTask,
+}: {
+  task: TaskItem;
+  onToggleTask: (task: TaskItem) => void;
+  onDeleteTask: (id: string) => void;
+  onEditTask?: (task: TaskItem) => void;
+}) {
+  const overdue = !task.is_completed && isOverdue(task.due_at);
+  const dueSoon = !task.is_completed && !overdue && isDueSoon(task.due_at);
+
+  const dueDate = task.due_at
+    ? new Date(task.due_at).toLocaleDateString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "No deadline";
+
+  const statusPill = task.is_completed
+    ? {
+        label: "Completed",
+        bg: "bg-[#dcfce7]",
+        text: "text-[#16a34a]",
+        border: "border-[#bbf7d0]",
+      }
+    : overdue
+    ? {
+        label: "Overdue",
+        bg: "bg-rose-100",
+        text: "text-rose-800",
+        border: "border-rose-300",
+      }
+    : dueSoon
+    ? {
+        label: "Due soon",
+        bg: "bg-amber-100",
+        text: "text-amber-800",
+        border: "border-amber-300",
+      }
+    : {
+        label: "In progress",
+        bg: "bg-[#ede9fe]",
+        text: "text-[#7c3aed]",
+        border: "border-[#ddd6fe]",
+      };
+
+  return (
+    <div
+      className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 ${
+        task.is_completed
+          ? "bg-canvas/30 border-line/50 opacity-65"
+          : overdue
+          ? "bg-rose-50/40 border-rose-200 shadow-xs"
+          : "bg-surface hover:bg-canvas/40 border-line shadow-xs"
+      }`}
+    >
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <button
+          type="button"
+          onClick={() => onToggleTask(task)}
+          className="shrink-0 text-muted hover:text-emerald-600 transition-colors"
+          title={task.is_completed ? "Mark incomplete" : "Mark completed"}
+          aria-label={task.is_completed ? "Mark incomplete" : "Mark completed"}
+        >
+          <CheckCircle2
+            className={`size-5 ${
+              task.is_completed ? "text-emerald-600" : "text-subtle"
+            }`}
+          />
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <p
+            className={`text-xs sm:text-sm font-display font-semibold truncate ${
+              task.is_completed ? "line-through text-muted" : "text-ink"
+            }`}
+          >
+            {task.title}
+          </p>
+
+          <div className="flex items-center gap-2 mt-0.5 text-[0.6875rem] text-muted font-body">
+            <Clock className="size-3" />
+            <span>{dueDate}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Status pill & actions */}
+      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[0.6875rem] font-display font-semibold border ${statusPill.bg} ${statusPill.text} ${statusPill.border}`}
+        >
+          {statusPill.label}
+        </span>
+
+        {onEditTask && (
+          <button
+            type="button"
+            onClick={() => onEditTask(task)}
+            aria-label={`Edit task ${task.title}`}
+            className="p-1 rounded-lg text-subtle hover:text-ink hover:bg-mist transition-colors"
+            title="Edit task"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => onDeleteTask(task.id)}
+          aria-label={`Delete task ${task.title}`}
+          className="p-1 rounded-lg text-subtle hover:text-rose-600 hover:bg-rose-50 transition-colors"
+          title="Delete task"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
       </div>
     </div>
   );

@@ -7,13 +7,16 @@ import {
   Circle,
   Clock,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 import { TaskItem } from "@/lib/dashboard-api";
+import { toLocalDateKey, isOverdue, isDueSoon } from "@/lib/dates";
 
 interface DailyScheduleProps {
   tasks: TaskItem[];
   onToggleTask: (task: TaskItem) => void;
   onAddTaskClick: () => void;
+  onEditTask?: (task: TaskItem) => void;
   className?: string;
 }
 
@@ -22,7 +25,7 @@ const PRIORITY_STYLES: Record<
   { label: string; bg: string; text: string; border: string }
 > = {
   3: {
-    label: "High Priority",
+    label: "High",
     bg: "bg-rose-50",
     text: "text-rose-700",
     border: "border-rose-200",
@@ -45,15 +48,30 @@ export function DailySchedule({
   tasks,
   onToggleTask,
   onAddTaskClick,
+  onEditTask,
   className = "",
 }: DailyScheduleProps) {
-  // Sort tasks: pending first, then by priority (descending)
-  const sortedTasks = [...tasks]
-    .sort((a, b) => {
-      if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1;
-      return b.priority - a.priority;
-    })
-    .slice(0, 5); // display top 5 for the daily schedule section
+  const todayKey = toLocalDateKey(new Date());
+
+  // DailySchedule shows only today's tasks (local day) plus overdue open tasks, not all tasks.
+  const dailyTasks = tasks.filter((task) => {
+    if (!task.due_at) return false;
+    const taskDateKey = toLocalDateKey(task.due_at);
+    if (taskDateKey === todayKey) return true;
+    if (!task.is_completed && isOverdue(task.due_at)) return true;
+    return false;
+  });
+
+  // Sort tasks: pending overdue first, then open today by priority/time, completed last
+  const sortedTasks = [...dailyTasks].sort((a, b) => {
+    if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1;
+    const aOverdue = !a.is_completed && isOverdue(a.due_at);
+    const bOverdue = !b.is_completed && isOverdue(b.due_at);
+    if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+    return b.priority - a.priority;
+  });
+
+  const pendingCount = dailyTasks.filter((t) => !t.is_completed).length;
 
   return (
     <div
@@ -66,7 +84,7 @@ export function DailySchedule({
               Daily Schedule
             </h3>
             <span className="inline-flex items-center justify-center size-5 rounded-full bg-mist text-[0.6875rem] font-display font-bold text-ink">
-              {tasks.filter((t) => !t.is_completed).length}
+              {pendingCount}
             </span>
           </div>
           <button
@@ -99,12 +117,17 @@ export function DailySchedule({
                   })
                 : null;
 
+              const overdue = !task.is_completed && isOverdue(task.due_at);
+              const dueSoon = !task.is_completed && !overdue && isDueSoon(task.due_at);
+
               return (
                 <div
                   key={task.id}
                   className={`group flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 ${
                     task.is_completed
                       ? "bg-canvas/40 border-line/50 opacity-60"
+                      : overdue
+                      ? "bg-rose-50/40 border-rose-200 shadow-xs"
                       : "bg-surface hover:bg-canvas/50 border-line shadow-xs hover:border-line-strong"
                   }`}
                 >
@@ -133,12 +156,24 @@ export function DailySchedule({
                         {task.title}
                       </p>
 
-                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                         <span
                           className={`inline-flex items-center px-1.5 py-0.2 rounded-md text-[0.625rem] font-display font-semibold border ${priorityInfo.bg} ${priorityInfo.text} ${priorityInfo.border}`}
                         >
                           {priorityInfo.label}
                         </span>
+
+                        {overdue && (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[0.625rem] font-display font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                            Overdue
+                          </span>
+                        )}
+
+                        {dueSoon && (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[0.625rem] font-display font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            Due soon
+                          </span>
+                        )}
 
                         {dueTime && (
                           <span className="inline-flex items-center gap-1 text-[0.6875rem] text-muted font-body">
@@ -149,6 +184,19 @@ export function DailySchedule({
                       </div>
                     </div>
                   </div>
+
+                  {/* Edit action */}
+                  {onEditTask && (
+                    <button
+                      type="button"
+                      onClick={() => onEditTask(task)}
+                      aria-label={`Edit task ${task.title}`}
+                      className="p-1.5 rounded-lg text-subtle hover:text-ink hover:bg-mist transition-colors shrink-0"
+                      title="Edit task"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  )}
                 </div>
               );
             })}

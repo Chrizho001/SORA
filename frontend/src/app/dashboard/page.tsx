@@ -30,6 +30,7 @@ export default function DashboardHomePage() {
   // Modals state
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
 
   // Queries
   const documentsQuery = useDocuments();
@@ -59,8 +60,26 @@ export default function DashboardHomePage() {
     try {
       await createTaskMutation.mutateAsync(payload);
       setIsTaskModalOpen(false);
+      setEditingTask(null);
     } catch (err: unknown) {
       notify.error(formatApiErrorMessage(err), "Failed to Create Task");
+    }
+  };
+
+  // Task edit handler
+  const handleEditTask = (task: TaskItem) => {
+    setEditingTask(task);
+    setIsTaskModalOpen(true);
+  };
+
+  // Task update handler with try/catch
+  const handleUpdateTask = async (id: string, payload: Partial<CreateTaskPayload>) => {
+    try {
+      await updateTaskMutation.mutateAsync({ id, payload });
+      setIsTaskModalOpen(false);
+      setEditingTask(null);
+    } catch (err: unknown) {
+      notify.error(formatApiErrorMessage(err), "Failed to Update Task");
     }
   };
 
@@ -113,9 +132,13 @@ export default function DashboardHomePage() {
           quizSessionsQuery.refetch();
         }}
         onUploadClick={() => setIsUploadModalOpen(true)}
-        onAddTaskClick={() => setIsTaskModalOpen(true)}
+        onAddTaskClick={() => {
+          setEditingTask(null);
+          setIsTaskModalOpen(true);
+        }}
         onToggleTask={handleToggleTask}
         onDeleteTask={(id) => deleteTaskMutation.mutate(id)}
+        onEditTask={handleEditTask}
         onGenerateFlashcards={(docId) => generateCardsMutation.mutate(docId)}
         onStartQuiz={handleStartQuiz}
         onViewDocument={() => router.push("/dashboard/documents")}
@@ -131,8 +154,13 @@ export default function DashboardHomePage() {
 
       <TaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        task={editingTask}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setEditingTask(null);
+        }}
         onSubmit={handleCreateTask}
+        onUpdate={handleUpdateTask}
       />
     </>
   );

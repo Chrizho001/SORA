@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, RotateCcw } from "lucide-react";
 import { TaskItem } from "@/lib/dashboard-api";
+import { toLocalDateKey } from "@/lib/dates";
 
 interface MiniCalendarProps {
   tasks?: TaskItem[];
@@ -67,7 +68,8 @@ export function MiniCalendar({
   // Map task counts by date
   const tasksByDate = tasks.reduce<Record<string, number>>((acc, task) => {
     if (!task.due_at) return acc;
-    const taskDate = task.due_at.split("T")[0];
+    const taskDate = toLocalDateKey(task.due_at);
+    if (!taskDate) return acc;
     acc[taskDate] = (acc[taskDate] || 0) + 1;
     return acc;
   }, {});

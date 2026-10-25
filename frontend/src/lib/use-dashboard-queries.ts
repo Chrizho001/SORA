@@ -14,6 +14,7 @@ import {
 import { formatApiErrorMessage } from "./axios-client";
 import { notify } from "@/components/auth/ToastProvider";
 import { useAuth } from "./auth-context";
+import { userTimeZone } from "./dates";
 
 /**
  * Prefix query keys with userId to guarantee multi-user isolation
@@ -205,9 +206,13 @@ export function useSubmitQuiz() {
 
 export function useTasks(params?: TaskQueryParams) {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const queryParams = params ? { ...params } : undefined;
+  if (queryParams?.date && !queryParams.tz) {
+    queryParams.tz = userTimeZone();
+  }
   return useQuery({
-    queryKey: qk(user?.id, "tasks", params),
-    queryFn: () => tasksApi.getTasks(params),
+    queryKey: qk(user?.id, "tasks", queryParams),
+    queryFn: () => tasksApi.getTasks(queryParams),
     enabled: !!user && !isAuthLoading,
   });
 }

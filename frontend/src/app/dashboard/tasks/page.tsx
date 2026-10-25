@@ -15,6 +15,7 @@ import { CreateTaskPayload, TaskItem } from "@/lib/dashboard-api";
 
 export default function TasksPage() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
 
   const tasksQuery = useTasks();
   const createTaskMutation = useCreateTask();
@@ -32,8 +33,24 @@ export default function TasksPage() {
     try {
       await createTaskMutation.mutateAsync(payload);
       setIsTaskModalOpen(false);
+      setEditingTask(null);
     } catch (err: unknown) {
       notify.error(formatApiErrorMessage(err), "Failed to Create Task");
+    }
+  };
+
+  const handleEditTask = (task: TaskItem) => {
+    setEditingTask(task);
+    setIsTaskModalOpen(true);
+  };
+
+  const handleUpdateTask = async (id: string, payload: Partial<CreateTaskPayload>) => {
+    try {
+      await updateTaskMutation.mutateAsync({ id, payload });
+      setIsTaskModalOpen(false);
+      setEditingTask(null);
+    } catch (err: unknown) {
+      notify.error(formatApiErrorMessage(err), "Failed to Update Task");
     }
   };
 
@@ -46,13 +63,22 @@ export default function TasksPage() {
         onRetry={() => tasksQuery.refetch()}
         onToggleTask={handleToggleTask}
         onDeleteTask={(id) => deleteTaskMutation.mutate(id)}
-        onAddTaskClick={() => setIsTaskModalOpen(true)}
+        onAddTaskClick={() => {
+          setEditingTask(null);
+          setIsTaskModalOpen(true);
+        }}
+        onEditTask={handleEditTask}
       />
 
       <TaskModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        task={editingTask}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setEditingTask(null);
+        }}
         onSubmit={handleCreateTask}
+        onUpdate={handleUpdateTask}
       />
     </>
   );
