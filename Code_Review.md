@@ -51,7 +51,7 @@ This file is the **single source of truth for open work**. It supersedes
 
 ## 1. Backend — Security
 
-- [ ] **SEC-01 · P0 · An attacker can pre-register a victim's email and keep access after the victim signs in with Google**
+- [x] **SEC-01 · P0 · An attacker can pre-register a victim's email and keep access after the victim signs in with Google**
   - **Where:** `backend/apps/accounts/services.py` `login_with_google()` (around lines 270–300). Spec rule:
     `architecture/01-authentication.md` §5 rule 9 (now corrected).
   - **Problem:** If an *unverified* password account exists for an email and that person later signs in
@@ -69,7 +69,7 @@ This file is the **single source of truth for open work**. It supersedes
     is still usable.
   - **Prompt:** P-01
 
-- [ ] **SEC-02 · P0 · Token-refresh, email-verification and reset-confirm endpoints have no throttle**
+- [x] **SEC-02 · P0 · Token-refresh, email-verification and reset-confirm endpoints have no throttle**
   - **Where:** `backend/apps/accounts/views.py` — `VerifyEmailAPIView`, `TokenRefreshAPIView`,
     `PasswordResetConfirmAPIView`. Rates are set in `backend/config/settings/base.py` `DEFAULT_THROTTLE_RATES`.
   - **Problem:** unlimited guessing or brute force of verification and reset tokens, and unlimited refresh
@@ -81,7 +81,7 @@ This file is the **single source of truth for open work**. It supersedes
     the overrides don't leak into other tests.
   - **Prompt:** P-01
 
-- [ ] **SEC-03 · P0 · Rate limiting is wrong behind a reverse proxy**
+- [x] **SEC-03 · P0 · Rate limiting is wrong behind a reverse proxy**
   - **Where:** `backend/config/settings/base.py` (`NUM_PROXIES` defaults to 0) and `prod.py` (does not set it).
   - **Problem:** behind any proxy (Render, Railway, Nginx, a Next.js rewrite), every user appears to come
     from the proxy's IP. All users then share one login bucket of 5/min, so one person can lock everyone out.
@@ -91,7 +91,7 @@ This file is the **single source of truth for open work**. It supersedes
     states how many proxies sit in front of Django.
   - **Prompt:** P-01
 
-- [ ] **SEC-04 · P1 · Oversized uploads are buffered before they are rejected; empty files are accepted**
+- [x] **SEC-04 · P1 · Oversized uploads are buffered before they are rejected; empty files are accepted**
   - **Where:** `backend/apps/documents/serializers.py` `validate_file`; settings.
   - **Problem:** the 10 MB check runs only after Django has read the whole body into memory or a temp file.
     A 0-byte file passes the magic-byte check path inconsistently.
@@ -123,7 +123,7 @@ This file is the **single source of truth for open work**. It supersedes
     string is absent.
   - **Prompt:** P-03
 
-- [ ] **SEC-07 · P1 · Logout can revoke other users' push subscriptions**
+- [x] **SEC-07 · P1 · Logout can revoke other users' push subscriptions**
   - **Where:** `backend/apps/accounts/views.py` `LogoutAPIView` (push-subscription revoke by `endpoint`).
   - **Problem:** an unauthenticated logout carrying any `endpoint` revokes whichever subscription matches,
     regardless of owner.
@@ -144,7 +144,7 @@ This file is the **single source of truth for open work**. It supersedes
     is enough. Fixed as part of FEAT-02.
   - **Prompt:** P-05
 
-- [ ] **SEC-10 · P2 · Two concurrent refreshes with the same token both succeed**
+- [x] **SEC-10 · P2 · Two concurrent refreshes with the same token both succeed**
   - **Where:** `backend/apps/accounts/views.py` `TokenRefreshAPIView` (blacklist-then-mint without a lock).
   - **Acceptable solution:** document it as accepted risk once the frontend uses a single in-flight refresh
     (FE-02).
@@ -152,7 +152,7 @@ This file is the **single source of truth for open work**. It supersedes
     `get_or_create`. If it was not created by this request, return 401 `refresh_invalid`.
   - **Prompt:** P-01
 
-- [ ] **SEC-11 · P1 · Production settings fail open**
+- [x] **SEC-11 · P1 · Production settings fail open**
   - **Where:** `backend/config/settings/prod.py`, `base.py`.
   - **Problem:** `CSRF_TRUSTED_ORIGINS` defaults to localhost, `EMAIL_HOST` to `""` and `GOOGLE_CLIENT_ID`
     to `""`, so a misconfigured deploy starts and silently breaks. The docstring still says "stub".
@@ -161,7 +161,7 @@ This file is the **single source of truth for open work**. It supersedes
     docstring.
   - **Prompt:** P-01
 
-- [ ] **SEC-12 · P0 (guard rail) · Email links must only ever be built from `settings.FRONTEND_URL`**
+- [x] **SEC-12 · P0 (guard rail) · Email links must only ever be built from `settings.FRONTEND_URL`**
   - **Where:** `backend/apps/accounts/services.py` (verification and reset link builders).
   - **Problem:** the ngrok branch built links from the request `Origin`/`Referer`, which allowed reset-token
     theft through a poisoned link. `main` is currently correct; this item adds the regression test.

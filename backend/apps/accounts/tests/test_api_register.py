@@ -71,6 +71,32 @@ class TestRegisterAPI:
         assert email_msg.to == ["emailtest@uni.edu"]
         assert f"{settings.FRONTEND_URL}/verify-email?token=" in email_msg.body
 
+    def test_email_link_ignores_origin_and_referer_headers(self, api_client):
+        mail.outbox.clear()
+        payload = {
+            "email": "origin_check@uni.edu",
+            "password": "Secure!Password123",
+            "password_confirm": "Secure!Password123",
+            "first_name": "Origin",
+            "last_name": "Check",
+        }
+        response = api_client.post(
+            self.url,
+            payload,
+            format="json",
+            HTTP_ORIGIN="https://evil.example",
+            HTTP_REFERER="https://evil.example/x",
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        links = [
+            line.strip()
+            for line in mail.outbox[0].body.splitlines()
+            if "verify-email?token=" in line
+        ]
+        assert len(links) == 1
+        assert links[0].startswith(settings.FRONTEND_URL)
+        assert "evil.example" not in mail.outbox[0].body
+
     def test_duplicate_email_any_case_returns_400(self, api_client, user):
         # user email is testuser@example.com
         payload = {

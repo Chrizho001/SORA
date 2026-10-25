@@ -1,7 +1,8 @@
 """
 Group 7 — Password reset endpoint tests.
 
-Architecture ref: 01-authentication.md §4 (POST password-reset/, POST password-reset/confirm/), §7 (Group 7).
+Architecture ref: 01-authentication.md §4 (POST password-reset/,
+POST password-reset/confirm/), §7 (Group 7).
 """
 
 import pytest
@@ -22,11 +23,6 @@ User = get_user_model()
 class TestPasswordResetAPI:
     """Tests for POST /api/v1/auth/password-reset/"""
 
-    # We use a dummy url since we need to add the view and url to urls.py later
-    # but let's assume the name will be "accounts:password-reset"
-    # Wait, we need to make sure reverse doesn't fail. If the url isn't defined yet, reverse will fail.
-    # So we'll define it dynamically or just rely on the TDD cycle: test fails because of NoReverseMatch, then we add the URL.
-
     @property
     def url(self):
         return reverse("accounts:password-reset")
@@ -42,6 +38,26 @@ class TestPasswordResetAPI:
         assert mail.outbox[0].to == [user.email]
         assert "reset-password?uid=" in mail.outbox[0].body
         assert "&token=" in mail.outbox[0].body
+
+    def test_email_link_ignores_origin_and_referer_headers(self, api_client, user):
+        mail.outbox.clear()
+        response = api_client.post(
+            self.url,
+            {"email": user.email},
+            format="json",
+            HTTP_ORIGIN="https://evil.example",
+            HTTP_REFERER="https://evil.example/x",
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert len(mail.outbox) == 1
+        links = [
+            line.strip()
+            for line in mail.outbox[0].body.splitlines()
+            if "reset-password?uid=" in line
+        ]
+        assert len(links) == 1
+        assert links[0].startswith(settings.FRONTEND_URL)
+        assert "evil.example" not in mail.outbox[0].body
 
     def test_unknown_email_sends_no_email(self, api_client):
         mail.outbox.clear()
@@ -77,10 +93,12 @@ class TestPasswordResetConfirmAPI:
             "uid": uid,
             "token": token,
             "new_password": "New!Password123",
-            "new_password_confirm": "New!Password123"
+            "new_password_confirm": "New!Password123",
         }
 
-    def test_valid_token_resets_password_and_blacklists_refresh_tokens(self, api_client, user, password):
+    def test_valid_token_resets_password_and_blacklists_refresh_tokens(
+        self, api_client, user, password
+    ):
         from rest_framework_simplejwt.tokens import RefreshToken
 
         refresh = RefreshToken.for_user(user)
@@ -120,12 +138,12 @@ class TestPasswordResetConfirmAPI:
         assert response2.data["code"] == "invalid_token"
 
     def test_expired_token_returns_400(self, api_client, user):
-        # The password reset token generator uses settings.PASSWORD_RESET_TIMEOUT which defaults to 3600s
-        # BUT it measures days since Jan 1 2001, so freezegun must freeze to a specific date to be safe.
+        # The password reset token generator uses settings.PASSWORD_RESET_TIMEOUT
+        # which defaults to 3600s, but measures days since Jan 1 2001.
         with freeze_time("2026-01-01 12:00:00"):
             payload = self.get_valid_payload(user)
 
-        with freeze_time("2026-01-02 12:00:01"): # Next day (well over 1 hr)
+        with freeze_time("2026-01-02 12:00:01"):
             response = api_client.post(self.url, payload, format="json")
             assert response.status_code == status.HTTP_400_BAD_REQUEST
             assert response.data["code"] == "invalid_token"

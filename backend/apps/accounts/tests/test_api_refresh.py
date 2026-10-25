@@ -75,7 +75,7 @@ class TestTokenRefreshAPI:
         with freeze_time("2026-01-01 12:00:00"):
             old_refresh = RefreshToken.for_user(user)
 
-        with freeze_time("2026-01-09 12:00:00"): # > 7 days
+        with freeze_time("2026-01-09 12:00:00"):  # > 7 days
             api_client.cookies[settings.AUTH_REFRESH_COOKIE_NAME] = str(old_refresh)
             response = api_client.post(self.url, **self.get_headers())
 
@@ -105,17 +105,18 @@ class TestTokenRefreshAPI:
 
     def test_refresh_rejected_after_max_session_age(self, api_client, user):
         import time
+
         with freeze_time("2026-01-01 12:00:00"):
             refresh = RefreshToken.for_user(user)
             refresh["auth_time"] = int(time.time())
-            
+
         with freeze_time("2026-01-04 12:00:00"):
             # Rotate at day 3 (within 7 days)
             api_client.cookies[settings.AUTH_REFRESH_COOKIE_NAME] = str(refresh)
             res1 = api_client.post(self.url, **self.get_headers())
             assert res1.status_code == 200
             refresh2_str = res1.cookies[settings.AUTH_REFRESH_COOKIE_NAME].value
-            
+
         with freeze_time("2026-01-06 12:00:00"):
             # Mock settings.AUTH_MAX_SESSION_AGE to 4 days (4 * 86400)
             settings.AUTH_MAX_SESSION_AGE = 4 * 86400
@@ -124,3 +125,19 @@ class TestTokenRefreshAPI:
             res2 = api_client.post(self.url, **self.get_headers())
             assert res2.status_code == status.HTTP_401_UNAUTHORIZED
             assert res2.data["code"] == "refresh_invalid"
+
+    def test_refresh_twice_with_same_cookie_second_gets_401(self, api_client, user):
+        old_refresh = RefreshToken.for_user(user)
+        cookie_name = settings.AUTH_REFRESH_COOKIE_NAME
+        api_client.cookies[cookie_name] = str(old_refresh)
+
+        # First refresh succeeds
+        res1 = api_client.post(self.url, **self.get_headers())
+        assert res1.status_code == status.HTTP_200_OK
+
+        # Second refresh with exact same cookie value gets 401 refresh_invalid and clears cookie
+        api_client.cookies[cookie_name] = str(old_refresh)
+        res2 = api_client.post(self.url, **self.get_headers())
+        assert res2.status_code == status.HTTP_401_UNAUTHORIZED
+        assert res2.data["code"] == "refresh_invalid"
+        assert res2.cookies[cookie_name]["max-age"] == 0 or res2.cookies[cookie_name].value == ""

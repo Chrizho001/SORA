@@ -31,9 +31,12 @@ def test_prod_settings_refuses_mock_ai_provider(monkeypatch):
 def test_prod_settings_accepts_openai_ai_provider(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("SECRET_KEY", "dummy-secret-key")
+    monkeypatch.setenv("FRONTEND_URL", "https://sora.study")
+    monkeypatch.setenv("EMAIL_HOST", "smtp.example.com")
     import config.settings.base
 
     importlib.reload(config.settings.base)
+
     mod = importlib.import_module("config.settings.prod")
     importlib.reload(mod)
     assert mod.AI_PROVIDER == "openai"

@@ -133,9 +133,13 @@ class TestGoogleLoginAPI:
         social_acc.refresh_from_db()
         assert social_acc.last_login_at > past
 
-    def test_unverified_user_matching_email_verifies_and_links(
-        self, api_client, unverified_user, mock_verify_google_token
+    def test_unverified_existing_user_google_login_clears_password_and_revokes_tokens(
+        self, api_client, unverified_user, password, mock_verify_google_token
     ):
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        old_refresh = RefreshToken.for_user(unverified_user)
+
         mock_verify_google_token.return_value = {
             "iss": "https://accounts.google.com",
             "sub": "google789",
@@ -146,7 +150,6 @@ class TestGoogleLoginAPI:
         }
 
         response = api_client.post(self.url, {"token": "valid_mock_token"}, format="json")
-
         assert response.status_code == status.HTTP_200_OK
 
         unverified_user.refresh_from_db()
@@ -154,6 +157,49 @@ class TestGoogleLoginAPI:
         assert unverified_user.social_accounts.filter(
             provider="google", provider_uid="google789"
         ).exists()
+        assert unverified_user.has_usable_password() is False
+
+        # Old password login returns 401
+        login_url = reverse("accounts:login")
+        login_response = api_client.post(
+            login_url,
+            {"email": unverified_user.email, "password": password},
+            format="json",
+        )
+        assert login_response.status_code == status.HTTP_401_UNAUTHORIZED
+
+        # Earlier refresh token is blacklisted
+        cookie_name = settings.AUTH_REFRESH_COOKIE_NAME
+        api_client.cookies[cookie_name] = str(old_refresh)
+        refresh_url = reverse("accounts:token-refresh")
+        refresh_response = api_client.post(refresh_url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        assert refresh_response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_verified_existing_user_password_still_works(
+        self, api_client, user, password, mock_verify_google_token
+    ):
+        mock_verify_google_token.return_value = {
+            "iss": "https://accounts.google.com",
+            "sub": "google456_pw_check",
+            "email": user.email,
+            "given_name": "Existing",
+            "family_name": "User",
+            "email_verified": True,
+        }
+
+        response = api_client.post(self.url, {"token": "valid_mock_token"}, format="json")
+        assert response.status_code == status.HTTP_200_OK
+
+        user.refresh_from_db()
+        assert user.has_usable_password() is True
+
+        login_url = reverse("accounts:login")
+        login_response = api_client.post(
+            login_url,
+            {"email": user.email, "password": password},
+            format="json",
+        )
+        assert login_response.status_code == status.HTTP_200_OK
 
     def test_unverified_google_email_is_rejected(self, api_client, mock_verify_google_token):
         mock_verify_google_token.return_value = {

@@ -422,7 +422,7 @@ Fake claims fixture: `{"sub": "1234567890", "email": "ada@gmail.com", "email_ver
 - [x] returning Google user (same `sub`) → 200, `created: false`, no duplicate user or link
 - [x] existing password user with the same email (any case) → 200, Google linked, `is_email_verified` becomes True, password still works
 - [x] existing **unverified** password user → linked and now verified
-- [ ] existing **unverified** password user → after Google link `has_password` is false, the old password no longer logs in, and old refresh tokens are blacklisted (Code_Review SEC-01)
+- [x] existing **unverified** password user → after Google link `has_password` is false, the old password no longer logs in, and old refresh tokens are blacklisted (Code_Review SEC-01)
 - [x] names are not overwritten for an existing user
 - [x] missing `family_name` → user created with `last_name=""`
 - [x] `email_verified=false` → 401 `google_email_unverified`, no user created
@@ -440,9 +440,10 @@ Fake claims fixture: `{"sub": "1234567890", "email": "ada@gmail.com", "email_ver
 ### Group 11 — Cross-cutting
 - [x] the exception handler produces the envelope for 401/403/404/429 as well as 400
 - [x] the CORS preflight from `FRONTEND_URL` is allowed with credentials; another origin is not allowed
-- [ ] register and password-reset with `Origin: https://evil.example` and `Referer: https://evil.example/x` → emailed link starts with `FRONTEND_URL` (Code_Review SEC-12)
-- [ ] `verify-email/`, `token/refresh/`, `password-reset/confirm/` are throttled (`auth_verify` 10/min, `auth_refresh` 30/min, `auth_password` 10/min) (Code_Review SEC-02)
+- [x] register and password-reset with `Origin: https://evil.example` and `Referer: https://evil.example/x` → emailed link starts with `FRONTEND_URL` (Code_Review SEC-12)
+- [x] `verify-email/`, `token/refresh/`, `password-reset/confirm/` are throttled (`auth_verify` 10/min, `auth_refresh` 30/min, `auth_password` 10/min) (Code_Review SEC-02)
 - [ ] no log record contains a user's email address (Code_Review SEC-06)
+
 
 ## 8. Out of scope (v1)
 - Social providers other than Google (the `SocialAccount` model allows adding them later).

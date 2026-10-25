@@ -11,12 +11,12 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
 from django.core.signing import dumps
 from django.db import transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
 User = get_user_model()
 
 
@@ -295,8 +295,14 @@ def login_with_google(token: str) -> User:
                 raise AccountConflict("account_conflict")
 
             if not user.is_email_verified and google_data.get("email_verified"):
+                user.set_unusable_password()
+                revoke_all_refresh_tokens(user)
                 user.is_email_verified = True
-                user.save(update_fields=["is_email_verified", "updated_at"])
+                user.save()
+                logger.info(
+                    "Unverified account claimed via Google; password cleared: user_id=%s",
+                    user.id,
+                )
             return user
 
         created = False
@@ -348,8 +354,14 @@ def login_with_google(token: str) -> User:
                 raise AccountConflict("account_conflict")
 
             if not user.is_email_verified and google_data.get("email_verified"):
+                user.set_unusable_password()
+                revoke_all_refresh_tokens(user)
                 user.is_email_verified = True
-                user.save(update_fields=["is_email_verified", "updated_at"])
+                user.save()
+                logger.info(
+                    "Unverified account claimed via Google; password cleared: user_id=%s",
+                    user.id,
+                )
 
         return user
 

@@ -103,7 +103,7 @@ Response: 204 No Content
 - [ ] Duplicate task delivery for a DONE document is a no-op (status stays DONE, one Summary)
 - [ ] Retry: FAILED → 202; DONE → 400 `document_not_retryable`; fresh PROCESSING → 409; stale PROCESSING → 202
 - [ ] An exception containing `SECRET-INTERNAL` never appears in `error_message` or the notification
-- [ ] Empty file → 400 `file_empty`; Content-Length > 12 MB → 413
+- [x] Empty file → 400 `file_empty`; Content-Length > 12 MB → 413
 - [ ] List endpoint: constant query count for 1 vs 5 documents; no `summary.content` in list items
 - [ ] PATCH → 405
 - [ ] AI clients: success, 401/403, 429, 503-then-success retry, timeout and invalid JSON (patched `requests.post`)
