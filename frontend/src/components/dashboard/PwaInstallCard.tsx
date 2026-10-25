@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowUpRight,
-  CheckCircle2,
   Download,
   Smartphone,
   X,
@@ -53,9 +52,18 @@ export function PwaInstallCard({ className = "" }: { className?: string }) {
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
 
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsInstalled(true);
+      }
+    };
+    mediaQuery.addEventListener("change", handleDisplayModeChange);
+
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
+      mediaQuery.removeEventListener("change", handleDisplayModeChange);
     };
   }, []);
 
@@ -82,22 +90,9 @@ export function PwaInstallCard({ className = "" }: { className?: string }) {
     }
   };
 
+  // Hide the card completely when installed
   if (isInstalled) {
-    return (
-      <div
-        className={`rounded-2xl bg-[#1d202a] border border-[#2c303f] p-3.5 text-white transition-all hover:border-[#3d4256] ${className}`}
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="size-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="size-4" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-display font-semibold text-white truncate">SORA Installed</p>
-            <p className="text-[0.6875rem] text-gray-400">Ready for offline studying</p>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const modalContent =
@@ -140,7 +135,7 @@ export function PwaInstallCard({ className = "" }: { className?: string }) {
               </div>
 
               <p className="text-xs text-muted font-body leading-relaxed">
-                Add SORA to your home screen for full-screen offline access without browser toolbars.
+                Add SORA to your home screen for instant full-screen launch, notifications, and offline app shell access.
               </p>
 
               {/* Instructions steps */}
@@ -203,10 +198,10 @@ export function PwaInstallCard({ className = "" }: { className?: string }) {
 
         {/* Text descriptions */}
         <h3 className="font-display font-semibold text-sm text-white leading-snug">
-          Download our mobile app
+          Install SORA App
         </h3>
         <p className="text-[0.7rem] text-gray-400 font-body mt-1 leading-normal">
-          Install SORA on your phone for instant offline summaries and flashcards.
+          Install SORA on your phone or desktop for instant launch, notifications, and offline app shell.
         </p>
 
         {/* Action Button with hover animation */}

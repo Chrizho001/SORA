@@ -77,7 +77,6 @@ Thumbs.db
 pgdata/
 
 # Documentation & Design references
-docs/
 design/
 DESIGN.md
 PRODUCT.md

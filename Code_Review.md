@@ -413,7 +413,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
 
 ## 6. Frontend
 
-- [ ] **FE-01 · P0 · It is not a PWA: there is no manifest, no service worker and no offline shell**
+- [x] **FE-01 · P0 · It is not a PWA: there is no manifest, no service worker and no offline shell**
   - **Where:** `frontend/` (no `app/manifest.ts`, no Serwist in `package.json` or `next.config.ts`).
   - **Problem:** fails SRS §4 "Installability" and success criterion 6. Chrome never fires
     `beforeinstallprompt`, so `PwaInstallCard` always falls back to the manual instructions.
@@ -620,7 +620,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `NUM_PROXIES` set accordingly (SEC-03).
   - **Prompt:** P-18
 
-- [ ] **FE-24 · P2 · Duplicate icon sources**
+- [x] **FE-24 · P2 · Duplicate icon sources**
   - **Where:** `src/app/{favicon.ico,icon.svg,apple-icon.png}` and `public/*`, plus explicit `metadata.icons`.
   - **Acceptable solution:** keep one source, the file-based `app/` icons, and let the manifest reference
     `public/icons/*`.
