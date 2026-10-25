@@ -7,7 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { FlashcardsView } from "@/components/dashboard/views/FlashcardsView";
 import {
   useDocuments,
-  useFlashcards,
+  useCardsByDeck,
   useGenerateFlashcards,
 } from "@/lib/use-dashboard-queries";
 
@@ -17,7 +17,7 @@ function DeckStudyContent() {
   const deckId = params?.deckId as string;
 
   const documentsQuery = useDocuments();
-  const flashcardsQuery = useFlashcards(deckId);
+  const flashcardsQuery = useCardsByDeck(deckId);
   const generateCardsMutation = useGenerateFlashcards();
 
   return (

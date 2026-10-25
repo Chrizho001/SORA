@@ -26,9 +26,12 @@ export default function DocumentsPage() {
   const deleteDocMutation = useDeleteDocument();
   const startQuizMutation = useStartQuiz();
 
-  const handleUploadDocument = async (file: File) => {
+  const handleUploadDocument = async (
+    file: File,
+    onProgress?: (percent: number) => void
+  ) => {
     try {
-      return await uploadDocMutation.mutateAsync(file);
+      return await uploadDocMutation.mutateAsync({ file, onProgress });
     } catch (err: unknown) {
       notify.error(formatApiErrorMessage(err), "Failed to Upload Document");
       throw err;

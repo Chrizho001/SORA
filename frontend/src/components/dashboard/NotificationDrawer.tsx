@@ -2,18 +2,16 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   X,
   Bell,
   CheckCheck,
   Check,
-  Clock,
   Sparkles,
-  BookOpen,
-  Brain,
-  Zap,
 } from "lucide-react";
 import { NotificationItem } from "@/lib/dashboard-api";
+import { getNotificationConfig } from "@/lib/notification-types";
 
 interface NotificationDrawerProps {
   isOpen: boolean;
@@ -23,16 +21,6 @@ interface NotificationDrawerProps {
   onMarkAllRead: () => void;
 }
 
-const NOTIFICATION_ICONS: Record<string, React.ReactNode> = {
-  DOCUMENT_SUMMARY_SUCCESS: <BookOpen className="size-4 text-emerald-600" />,
-  DOCUMENT_SUMMARY_FAILED: <BookOpen className="size-4 text-rose-600" />,
-  FLASHCARD_GENERATION_SUCCESS: <Brain className="size-4 text-purple-600" />,
-  FLASHCARD_GENERATION_FAILED: <Brain className="size-4 text-rose-600" />,
-  QUIZ_SESSION_COMPLETED: <Zap className="size-4 text-amber-600" />,
-  TASK_DUE_SOON: <Clock className="size-4 text-sky-600" />,
-  DEFAULT: <Bell className="size-4 text-ink" />,
-};
-
 export function NotificationDrawer({
   isOpen,
   onClose,
@@ -40,9 +28,22 @@ export function NotificationDrawer({
   onMarkRead,
   onMarkAllRead,
 }: NotificationDrawerProps) {
+  const router = useRouter();
+
   if (!isOpen) return null;
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
+
+  const handleNotificationClick = (notif: NotificationItem) => {
+    const notifType = notif.type || notif.notification_type || "";
+    const config = getNotificationConfig(notifType);
+    if (!notif.read_at) {
+      onMarkRead(notif.id);
+    }
+    onClose();
+    const href = config.href(notif.data);
+    router.push(href);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
@@ -102,31 +103,38 @@ export function NotificationDrawer({
             </div>
           ) : (
             notifications.map((notif) => {
-              const icon = NOTIFICATION_ICONS[notif.notification_type] || NOTIFICATION_ICONS.DEFAULT;
+              const notifType = notif.type || notif.notification_type || "";
+              const config = getNotificationConfig(notifType);
+              const Icon = config.icon;
               const isUnread = !notif.read_at;
+              const messageText = notif.body || notif.message || "";
 
               return (
                 <div
                   key={notif.id}
-                  className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-start gap-3 ${
+                  onClick={() => handleNotificationClick(notif)}
+                  className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-start gap-3 cursor-pointer group ${
                     isUnread
-                      ? "bg-emerald-50/20 border-emerald-200/80 shadow-2xs"
-                      : "bg-surface hover:bg-canvas/40 border-line opacity-75"
+                      ? "bg-emerald-50/20 border-emerald-200/80 shadow-2xs hover:border-emerald-300"
+                      : "bg-surface hover:bg-canvas/50 border-line opacity-80 hover:opacity-100"
                   }`}
                 >
-                  <div className="size-8 rounded-xl bg-canvas border border-line flex items-center justify-center shrink-0 mt-0.5">
-                    {icon}
+                  <div className="size-8 rounded-xl bg-canvas border border-line flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                    <Icon className="size-4 text-ink" />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-display font-bold text-xs sm:text-sm text-ink truncate">
+                      <p className="font-display font-bold text-xs sm:text-sm text-ink truncate group-hover:text-black">
                         {notif.title}
                       </p>
                       {isUnread && (
                         <button
                           type="button"
-                          onClick={() => onMarkRead(notif.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMarkRead(notif.id);
+                          }}
                           className="size-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 transition-colors"
                           title="Mark read"
                         >
@@ -135,9 +143,11 @@ export function NotificationDrawer({
                       )}
                     </div>
 
-                    <p className="text-xs text-muted font-body mt-0.5 line-clamp-3">
-                      {notif.message}
-                    </p>
+                    {messageText && (
+                      <p className="text-xs text-muted font-body mt-0.5 line-clamp-3">
+                        {messageText}
+                      </p>
+                    )}
 
                     <span className="text-[0.6875rem] text-subtle font-body mt-1 block">
                       {new Date(notif.created_at).toLocaleString([], {

@@ -1,8 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useEffect, useMemo } from "react";
+import {
+  useMutation,
+  useQuery,
+  useInfiniteQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   documentsApi,
+  decksApi,
   flashcardsApi,
   quizzesApi,
   tasksApi,
@@ -35,16 +42,23 @@ export function useDocuments() {
     queryFn: () => documentsApi.getDocuments(),
     enabled: !!user && !isAuthLoading,
     refetchInterval: (query) => {
-      // Auto-poll every 4 seconds if any document is currently PROCESSING, UPLOADED, or GENERATING flashcards
+      // Auto-poll every 4 seconds if any document is currently PROCESSING, UPLOADED, or GENERATING flashcards,
+      // UNLESS all processing documents have been running for > 10 minutes (FE-20).
       const data = query.state.data;
       if (Array.isArray(data)) {
-        const hasActiveJobs = data.some(
-          (doc: DocumentItem) =>
-            doc.status === "PROCESSING" ||
-            doc.status === "UPLOADED" ||
-            doc.flashcard_generation_status === "GENERATING"
-        );
-        if (hasActiveJobs) return 4000;
+        const now = Date.now();
+        const hasActiveNonStuckJobs = data.some((doc: DocumentItem) => {
+          if (doc.flashcard_generation_status === "GENERATING") return true;
+          if (doc.status === "PROCESSING" || doc.status === "UPLOADED") {
+            const start = doc.processing_started_at
+              ? new Date(doc.processing_started_at).getTime()
+              : new Date(doc.created_at).getTime();
+            // If <= 10 minutes, keep polling
+            return now - start <= 10 * 60 * 1000;
+          }
+          return false;
+        });
+        if (hasActiveNonStuckJobs) return 4000;
       }
       return false;
     },
@@ -55,7 +69,12 @@ export function useUploadDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: (file: File) => documentsApi.uploadDocument(file),
+    mutationFn: (variables: File | { file: File; onProgress?: (percent: number) => void }) => {
+      if (variables instanceof File) {
+        return documentsApi.uploadDocument(variables);
+      }
+      return documentsApi.uploadDocument(variables.file, variables.onProgress);
+    },
     onSuccess: (newDoc) => {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "documents") });
       notify.success(
@@ -80,7 +99,21 @@ export function useRetryDocument() {
       notify.info("SORA AI is re-analyzing your document with AI vision.", "Analysis Restarted");
     },
     onError: (error: unknown) => {
+      const status = (error as { response?: { status?: number } })?.response?.status;
       const msg = formatApiErrorMessage(error);
+      if (status === 409) {
+        queryClient.invalidateQueries({ queryKey: qk(user?.id, "documents") });
+        notify.warning(
+          msg || "Document analysis is already underway or complete.",
+          "Retry Conflict (409)"
+        );
+        return;
+      }
+      if (status === 400) {
+        queryClient.invalidateQueries({ queryKey: qk(user?.id, "documents") });
+        notify.warning(msg || "Document is already being analyzed.", "Cannot Retry (400)");
+        return;
+      }
       notify.error(msg, "Retry Failed");
     },
   });
@@ -94,6 +127,7 @@ export function useGenerateFlashcards() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "documents") });
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards") });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
       notify.success(
         "SORA AI is generating smart flashcards from your summary!",
         "Flashcards Queued"
@@ -114,6 +148,7 @@ export function useDeleteDocument() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "documents") });
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards") });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "quiz-sessions") });
       notify.info("Document and associated materials deleted.", "Document Removed");
     },
@@ -125,15 +160,34 @@ export function useDeleteDocument() {
 }
 
 // ==========================================
-// FLASHCARDS QUERY HOOKS
+// DECKS & FLASHCARDS QUERY HOOKS
 // ==========================================
 
-export function useFlashcards(documentId?: string) {
+export function useDecks(params?: { document?: string }) {
   const { user, isLoading: isAuthLoading } = useAuth();
   return useQuery({
-    queryKey: qk(user?.id, "flashcards", documentId),
-    queryFn: () => flashcardsApi.getFlashcards(documentId),
+    queryKey: qk(user?.id, "decks", params),
+    queryFn: () => decksApi.getDecks(params),
     enabled: !!user && !isAuthLoading,
+  });
+}
+
+export function useFlashcards(filter?: { document?: string; deck?: string } | string) {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const filterKey = typeof filter === "string" ? { document: filter } : filter;
+  return useQuery({
+    queryKey: qk(user?.id, "flashcards", filterKey),
+    queryFn: () => flashcardsApi.getFlashcards(filter),
+    enabled: !!user && !isAuthLoading,
+  });
+}
+
+export function useCardsByDeck(deckId: string) {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  return useQuery({
+    queryKey: qk(user?.id, "flashcards", "deck", deckId),
+    queryFn: () => flashcardsApi.getCardsByDeck(deckId),
+    enabled: !!user && !isAuthLoading && !!deckId,
   });
 }
 
@@ -164,9 +218,12 @@ export function useStartQuiz() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: (documentId: string) => documentsApi.startQuiz(documentId),
-    onSuccess: () => {
+    onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "quiz-sessions") });
-      notify.success("Speed quiz initialized! Good luck!", "Quiz Ready");
+      notify.success(
+        `Speed quiz generated with ${session.total_questions} questions!`,
+        "Quiz Ready"
+      );
     },
     onError: (error: unknown) => {
       const msg = formatApiErrorMessage(error);
@@ -270,23 +327,62 @@ export function useDeleteTask() {
 // NOTIFICATIONS QUERY HOOKS
 // ==========================================
 
-export function useNotifications() {
+export function useInfiniteNotifications() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: qk(user?.id, "notifications"),
-    queryFn: () => notificationsApi.getNotifications(),
+    queryFn: ({ pageParam }) => notificationsApi.getNotificationsPage(pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage.next) return undefined;
+      try {
+        const urlObj = new URL(lastPage.next, "http://dummy.local");
+        const page = urlObj.searchParams.get("page");
+        if (page) return Number(page);
+      } catch {
+        // fallback to incremental page
+      }
+      return allPages.length + 1;
+    },
     enabled: !!user && !isAuthLoading,
   });
 }
 
+export function useNotifications() {
+  const infinite = useInfiniteNotifications();
+  const allNotifications = useMemo(
+    () => infinite.data?.pages.flatMap((page) => page.results) ?? [],
+    [infinite.data]
+  );
+  return {
+    ...infinite,
+    data: allNotifications,
+  };
+}
+
 export function useUnreadNotificationCount() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  return useQuery({
+  const queryClient = useQueryClient();
+  const prevCountRef = useRef<number | undefined>(undefined);
+
+  const query = useQuery({
     queryKey: qk(user?.id, "notifications", "unread-count"),
     queryFn: () => notificationsApi.getUnreadCount(),
     enabled: !!user && !isAuthLoading,
     refetchInterval: 30000,
   });
+
+  useEffect(() => {
+    if (query.data !== undefined) {
+      if (prevCountRef.current !== undefined && prevCountRef.current !== query.data) {
+        // Invalidate notifications list query when polled unread count changes (FE-18)
+        queryClient.invalidateQueries({ queryKey: qk(user?.id, "notifications"), exact: true });
+      }
+      prevCountRef.current = query.data;
+    }
+  }, [query.data, queryClient, user?.id]);
+
+  return query;
 }
 
 export function useMarkNotificationRead() {

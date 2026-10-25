@@ -464,7 +464,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - "Start quiz" enabled only when the deck has at least 4 distinct answers.
   - **Prompt:** P-12
 
-- [ ] **FE-06 · P1 · Pagination is ignored: lists stop at 20 items**
+- [x] **FE-06 · P1 · Pagination is ignored: lists stop at 20 items**
   - **Where:** every `get*` in `frontend/src/lib/dashboard-api.ts`.
   - **Acceptable solution:** use `useInfiniteQuery` with a "Load more" button, or a helper that follows
     `next` up to a safe cap (e.g. 10 pages). Pass filters (`?deck=`) to the server instead of filtering on
@@ -495,7 +495,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - The mobile nav reaches every section (5 items plus a "More" sheet).
   - **Prompt:** P-11
 
-- [ ] **FE-10 · P0 · Notification type keys don't match the backend**
+- [x] **FE-10 · P0 · Notification type keys don't match the backend**
   - **Where:** `NotificationsView.tsx`, `NotificationDrawer.tsx` (they use `DOCUMENT_SUMMARY_SUCCESS` and
     similar).
   - **Problem:** only `TASK_DUE_SOON` matches, so everything else renders as "System Alert".
@@ -569,7 +569,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - "Retake mistakes" if P2 time allows.
   - **Prompt:** P-13
 
-- [ ] **FE-18 · P1 · The notification list goes stale while the unread badge updates**
+- [x] **FE-18 · P1 · The notification list goes stale while the unread badge updates**
   - **Where:** `use-dashboard-queries.ts` (only the unread count polls).
   - **Acceptable solution:** when the unread count changes, invalidate `["notifications"]`.
   - **Prompt:** P-16
@@ -580,7 +580,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
   - **Acceptable solution:** one error surface per action, and no auth toast after a voluntary logout.
   - **Prompt:** P-17
 
-- [ ] **FE-20 · P1 · Polling and timeouts**
+- [x] **FE-20 · P1 · Polling and timeouts**
   - **Where:** `use-dashboard-queries.ts` (document polling never stops for a stuck document);
     `axios-client.ts` (15 s upload timeout).
   - **Acceptable solution:** stop polling after 10 minutes per document and show a "Taking longer than

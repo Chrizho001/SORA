@@ -18,6 +18,8 @@ import { Skeleton } from "@/components/ui/Skeleton";
 interface FlashcardsViewProps {
   documents?: DocumentItem[];
   flashcards?: FlashcardItem[];
+  selectedDocId?: string;
+  onSelectDocId?: (docId: string) => void;
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
@@ -28,13 +30,16 @@ interface FlashcardsViewProps {
 export function FlashcardsView({
   documents,
   flashcards,
+  selectedDocId,
+  onSelectDocId,
   isLoading,
   isError,
   onRetry,
   onGenerateFlashcards,
   onNavigateDocuments,
 }: FlashcardsViewProps) {
-  const [selectedDocId, setSelectedDocId] = useState<string>("all");
+  const [localSelectedDocId, setLocalSelectedDocId] = useState<string>("all");
+  const effectiveDocId = selectedDocId ?? localSelectedDocId;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
 
@@ -90,11 +95,8 @@ export function FlashcardsView({
   const safeDocuments = documents ?? [];
   const safeFlashcards = flashcards ?? [];
 
-  // Filter flashcards by selected document
-  const activeDeck =
-    selectedDocId === "all"
-      ? safeFlashcards
-      : safeFlashcards.filter((f) => f.document === selectedDocId);
+  // Use server-filtered flashcards directly (FE-06)
+  const activeDeck = safeFlashcards;
 
   const currentCard = activeDeck[currentIndex];
 
@@ -131,9 +133,14 @@ export function FlashcardsView({
           <div className="flex items-center gap-2">
             <span className="text-xs font-display font-semibold text-muted">Deck:</span>
             <select
-              value={selectedDocId}
+              value={effectiveDocId}
               onChange={(e) => {
-                setSelectedDocId(e.target.value);
+                const val = e.target.value;
+                if (onSelectDocId) {
+                  onSelectDocId(val);
+                } else {
+                  setLocalSelectedDocId(val);
+                }
                 setCurrentIndex(0);
                 setIsFlipped(false);
               }}

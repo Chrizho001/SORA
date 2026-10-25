@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   Plus,
@@ -44,6 +44,16 @@ export function DocumentsView({
   onRetryDocument,
 }: DocumentsViewProps) {
   const [selectedSummaryDoc, setSelectedSummaryDoc] = useState<DocumentItem | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setCurrentTime(Date.now()), 0);
+    const interval = setInterval(() => setCurrentTime(Date.now()), 15000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -160,6 +170,11 @@ export function DocumentsView({
             const hasFlashcards = doc.flashcard_generation_status === "DONE";
             const isFlashcardsGenerating = doc.flashcard_generation_status === "GENERATING";
             const isFlashcardsFailed = doc.flashcard_generation_status === "FAILED";
+            const now = currentTime || 0;
+            const startTime = doc.processing_started_at
+              ? new Date(doc.processing_started_at).getTime()
+              : new Date(doc.created_at).getTime();
+            const isStuck = isProcessing && now > 0 && now - startTime > 10 * 60 * 1000;
 
             return (
               <div
@@ -167,6 +182,8 @@ export function DocumentsView({
                 className={`rounded-3xl bg-surface border transition-all duration-300 p-5 shadow-soft flex flex-col justify-between hover:shadow-lift hover:-translate-y-0.5 ${
                   isFailed
                     ? "border-rose-200/90 bg-rose-50/10"
+                    : isStuck
+                    ? "border-amber-300/90 bg-amber-50/10"
                     : isProcessing
                     ? "border-sky-200/90"
                     : "border-line"
@@ -179,12 +196,16 @@ export function DocumentsView({
                       className={`size-11 rounded-2xl flex items-center justify-center shrink-0 border ${
                         isFailed
                           ? "bg-rose-50 border-rose-200 text-rose-600"
+                          : isStuck
+                          ? "bg-amber-50 border-amber-200 text-amber-700"
                           : isProcessing
                           ? "bg-sky-50 border-sky-200 text-sky-600"
                           : "bg-emerald-50 border-emerald-200 text-emerald-600"
                       }`}
                     >
-                      {isProcessing ? (
+                      {isStuck ? (
+                        <AlertCircle className="size-5 text-amber-600" />
+                      ) : isProcessing ? (
                         <FileText className="size-5 animate-pulse" />
                       ) : isFailed ? (
                         <AlertCircle className="size-5" />
@@ -194,11 +215,15 @@ export function DocumentsView({
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      {isProcessing && (
+                      {isStuck ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-[0.6875rem] font-display font-semibold">
+                          Taking longer than expected
+                        </span>
+                      ) : isProcessing ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[0.6875rem] font-display font-semibold animate-pulse">
                           Processing PDF...
                         </span>
-                      )}
+                      ) : null}
                       {isDone && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[0.6875rem] font-display font-semibold">
                           Summary Ready
@@ -248,6 +273,19 @@ export function DocumentsView({
                     </div>
                   )}
 
+                  {/* Taking longer than expected message (FE-20) */}
+                  {isStuck && (
+                    <div className="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-xs font-body text-amber-800 space-y-1">
+                      <div className="font-display font-semibold flex items-center gap-1.5 text-amber-900">
+                        <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+                        <span>Taking longer than expected</span>
+                      </div>
+                      <p className="text-[0.6875rem] text-amber-700 leading-relaxed">
+                        Document analysis has been running for more than 10 minutes. Click Retry to restart analysis.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Error explanation if summary failed */}
                   {isFailed && (
                     <div className="mt-3 p-3 rounded-2xl bg-rose-50 border border-rose-200/80 text-xs font-body text-rose-800 space-y-1">
@@ -277,14 +315,14 @@ export function DocumentsView({
 
                 {/* Bottom Actions */}
                 <div className="pt-3 border-t border-line flex flex-wrap items-center gap-2 mt-4">
-                  {isFailed && onRetryDocument && (
+                  {(isFailed || isStuck) && onRetryDocument && (
                     <button
                       type="button"
                       onClick={() => onRetryDocument(doc.id)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold transition-all hover:scale-105 active:scale-95 shadow-xs"
                     >
                       <RotateCw className="size-3.5" />
-                      <span>Retry AI Analysis</span>
+                      <span>{isStuck ? "Retry Analysis" : "Retry AI Analysis"}</span>
                     </button>
                   )}
 

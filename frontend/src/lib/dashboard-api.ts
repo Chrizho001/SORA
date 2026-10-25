@@ -1,5 +1,71 @@
+import { AxiosInstance, AxiosResponse } from "axios";
 import { apiClient } from "./axios-client";
 import { userTimeZone } from "./dates";
+
+// ==========================================
+// PAGINATION HELPER (FE-06)
+// ==========================================
+
+export interface PaginatedResult<T> {
+  results: T[];
+  truncated: boolean;
+}
+
+export interface DRFPaginatedResponse<T> {
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: T[];
+}
+
+/**
+ * Fetches all pages for a given endpoint by following the `next` URL up to maxPages.
+ * Follows DRF pagination convention: { count, next, previous, results }.
+ */
+export async function fetchAllPages<T>(
+  client: AxiosInstance,
+  url: string,
+  params?: Record<string, unknown>,
+  maxPages = 10
+): Promise<PaginatedResult<T>> {
+  let currentUrl: string | null = url;
+  let currentParams: Record<string, unknown> | undefined = params;
+  const results: T[] = [];
+  let pageCount = 0;
+  let truncated = false;
+
+  while (currentUrl && pageCount < maxPages) {
+    pageCount++;
+    const res: AxiosResponse<T[] | DRFPaginatedResponse<T>> = await client.get<
+      T[] | DRFPaginatedResponse<T>
+    >(currentUrl, currentParams ? { params: currentParams } : undefined);
+
+    const data: T[] | DRFPaginatedResponse<T> = res.data;
+
+    if (Array.isArray(data)) {
+      results.push(...data);
+      break;
+    }
+
+    if (data?.results && Array.isArray(data.results)) {
+      results.push(...data.results);
+    }
+
+    const nextUrl: string | null | undefined = data?.next;
+    if (nextUrl) {
+      if (pageCount >= maxPages) {
+        truncated = true;
+        break;
+      }
+      currentUrl = nextUrl;
+      currentParams = undefined; // URL already includes any query parameters
+    } else {
+      break;
+    }
+  }
+
+  return { results, truncated };
+}
 
 // ==========================================
 // DOCUMENTS TYPES & API
@@ -25,15 +91,14 @@ export interface DocumentItem {
   error_message: string;
   created_at: string;
   updated_at: string;
+  processing_started_at?: string | null;
   summary: Summary | null;
 }
 
 export const documentsApi = {
   async getDocuments(): Promise<DocumentItem[]> {
-    const res = await apiClient.get<DocumentItem[] | { results: DocumentItem[] }>("/documents/");
-    if (Array.isArray(res.data)) return res.data;
-    if ("results" in res.data && Array.isArray(res.data.results)) return res.data.results;
-    return [];
+    const { results } = await fetchAllPages<DocumentItem>(apiClient, "/documents/");
+    return results;
   },
 
   async getDocument(id: string): Promise<DocumentItem> {
@@ -41,12 +106,22 @@ export const documentsApi = {
     return res.data;
   },
 
-  async uploadDocument(file: File): Promise<DocumentItem> {
+  async uploadDocument(
+    file: File,
+    onProgress?: (percent: number) => void
+  ): Promise<DocumentItem> {
     const formData = new FormData();
     formData.append("file", file);
     const res = await apiClient.post<DocumentItem>("/documents/", formData, {
+      timeout: 120000, // 120s timeout on upload request only (FE-20)
       headers: {
         "Content-Type": "multipart/form-data",
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress?.(percent);
+        }
       },
     });
     return res.data;
@@ -73,25 +148,87 @@ export const documentsApi = {
 };
 
 // ==========================================
-// FLASHCARDS TYPES & API
+// DECKS & FLASHCARDS TYPES & API
 // ==========================================
+
+export interface DeckItem {
+  id: string;
+  title: string;
+  description: string;
+  document: string | null;
+  document_name?: string;
+  card_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const decksApi = {
+  async getDecks(params?: { document?: string }): Promise<DeckItem[]> {
+    const { results } = await fetchAllPages<DeckItem>(
+      apiClient,
+      "/decks/",
+      params as Record<string, unknown>
+    );
+    return results;
+  },
+
+  async getDeck(id: string): Promise<DeckItem> {
+    const res = await apiClient.get<DeckItem>(`/decks/${id}/`);
+    return res.data;
+  },
+
+  async createDeck(payload: {
+    title: string;
+    description?: string;
+    document?: string | null;
+  }): Promise<DeckItem> {
+    const res = await apiClient.post<DeckItem>("/decks/", payload);
+    return res.data;
+  },
+
+  async updateDeck(
+    id: string,
+    payload: Partial<{ title: string; description: string }>
+  ): Promise<DeckItem> {
+    const res = await apiClient.patch<DeckItem>(`/decks/${id}/`, payload);
+    return res.data;
+  },
+
+  async deleteDeck(id: string): Promise<void> {
+    await apiClient.delete(`/decks/${id}/`);
+  },
+};
 
 export interface FlashcardItem {
   id: string;
-  document: string;
+  deck?: string;
+  document?: string;
   question: string;
   answer: string;
+  source?: "MANUAL" | "AI";
   created_at: string;
   updated_at: string;
 }
 
 export const flashcardsApi = {
-  async getFlashcards(documentId?: string): Promise<FlashcardItem[]> {
-    const params = documentId ? { document: documentId } : undefined;
-    const res = await apiClient.get<FlashcardItem[] | { results: FlashcardItem[] }>("/flashcards/", { params });
-    if (Array.isArray(res.data)) return res.data;
-    if ("results" in res.data && Array.isArray(res.data.results)) return res.data.results;
-    return [];
+  async getFlashcards(
+    filter?: { document?: string; deck?: string } | string
+  ): Promise<FlashcardItem[]> {
+    const params: Record<string, unknown> =
+      typeof filter === "string"
+        ? { document: filter }
+        : filter
+        ? { ...filter }
+        : {};
+    const { results } = await fetchAllPages<FlashcardItem>(apiClient, "/flashcards/", params);
+    return results;
+  },
+
+  async getCardsByDeck(deckId: string): Promise<FlashcardItem[]> {
+    const { results } = await fetchAllPages<FlashcardItem>(apiClient, "/flashcards/", {
+      deck: deckId,
+    });
+    return results;
   },
 
   async updateFlashcard(id: string, payload: Partial<FlashcardItem>): Promise<FlashcardItem> {
@@ -129,10 +266,8 @@ export interface QuizSession {
 
 export const quizzesApi = {
   async getQuizSessions(): Promise<QuizSession[]> {
-    const res = await apiClient.get<QuizSession[] | { results: QuizSession[] }>("/quiz-sessions/");
-    if (Array.isArray(res.data)) return res.data;
-    if ("results" in res.data && Array.isArray(res.data.results)) return res.data.results;
-    return [];
+    const { results } = await fetchAllPages<QuizSession>(apiClient, "/quiz-sessions/");
+    return results;
   },
 
   async getQuizSession(id: string): Promise<QuizSession> {
@@ -188,10 +323,12 @@ export const tasksApi = {
     if (finalParams?.date && !finalParams.tz) {
       finalParams.tz = userTimeZone();
     }
-    const res = await apiClient.get<TaskItem[] | { results: TaskItem[] }>("/tasks/", { params: finalParams });
-    if (Array.isArray(res.data)) return res.data;
-    if ("results" in res.data && Array.isArray(res.data.results)) return res.data.results;
-    return [];
+    const { results } = await fetchAllPages<TaskItem>(
+      apiClient,
+      "/tasks/",
+      finalParams as Record<string, unknown>
+    );
+    return results;
   },
 
   async createTask(payload: CreateTaskPayload): Promise<TaskItem> {
@@ -215,19 +352,56 @@ export const tasksApi = {
 
 export interface NotificationItem {
   id: string;
-  notification_type: string;
+  type?: string;
+  notification_type?: string;
   title: string;
-  message: string;
+  body?: string;
+  message?: string;
+  data?: Record<string, unknown> | null;
   read_at: string | null;
   created_at: string;
+  expires_at?: string | null;
+}
+
+export interface PaginatedNotificationsResponse {
+  results: NotificationItem[];
+  next: string | null;
+  count?: number;
 }
 
 export const notificationsApi = {
+  async getNotificationsPage(pageParam?: string | number): Promise<PaginatedNotificationsResponse> {
+    let url = "/notifications/";
+    let params: Record<string, unknown> | undefined = undefined;
+
+    if (typeof pageParam === "number") {
+      params = { page: pageParam };
+    } else if (typeof pageParam === "string" && pageParam) {
+      if (pageParam.startsWith("http")) {
+        url = pageParam;
+      } else {
+        params = { page: pageParam };
+      }
+    }
+
+    const res = await apiClient.get<NotificationItem[] | DRFPaginatedResponse<NotificationItem>>(url, {
+      params,
+    });
+
+    if (Array.isArray(res.data)) {
+      return { results: res.data, next: null };
+    }
+
+    return {
+      results: res.data.results || [],
+      next: res.data.next || null,
+      count: res.data.count,
+    };
+  },
+
   async getNotifications(): Promise<NotificationItem[]> {
-    const res = await apiClient.get<NotificationItem[] | { results: NotificationItem[] }>("/notifications/");
-    if (Array.isArray(res.data)) return res.data;
-    if ("results" in res.data && Array.isArray(res.data.results)) return res.data.results;
-    return [];
+    const page = await this.getNotificationsPage(1);
+    return page.results;
   },
 
   async getUnreadCount(): Promise<number> {
