@@ -61,6 +61,8 @@ class DeckViewSet(
     def get_throttles(self):
         if self.action == "generate_flashcards":
             self.throttle_scope = "ai_jobs"
+        elif self.action == "start_quiz":
+            self.throttle_scope = "quiz_create"
         return super().get_throttles()
 
     @action(detail=True, methods=["post"], url_path="generate-flashcards")
@@ -127,6 +129,23 @@ class DeckViewSet(
             raise
 
         return Response({"status": "GENERATING"}, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["post"], url_path="start-quiz", url_name="start-quiz")
+    def start_quiz(self, request, pk=None):
+        deck = self.get_object()
+
+        from apps.quizzes.serializers import QuizSessionDetailSerializer, StartQuizSerializer
+        from apps.quizzes.services import start_quiz
+
+        serializer = StartQuizSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        question_count = serializer.validated_data.get("question_count", 10)
+
+        session = start_quiz(user=request.user, deck=deck, question_count=question_count)
+        return Response(
+            QuizSessionDetailSerializer(session).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class FlashcardViewSet(

@@ -143,17 +143,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
-    @action(detail=True, methods=["post"], url_path="start-quiz")
-    def start_quiz(self, request, pk=None):
-        document = self.get_object()
-
-        from apps.quizzes.serializers import QuizSessionSerializer
-        from apps.quizzes.services import start_quiz
-
-        session = start_quiz(user=request.user, document=document)
-        serializer = QuizSessionSerializer(session)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
     @action(detail=True, methods=["post"], url_path="retry")
     def retry(self, request, pk=None):
         document = self.get_object()

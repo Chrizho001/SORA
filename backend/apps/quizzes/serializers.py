@@ -1,23 +1,14 @@
 from rest_framework import serializers
 
-from apps.flashcards.models import Flashcard
 from apps.quizzes.models import QuizQuestion, QuizSession
 
 
-class QuizFlashcardSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Flashcard
-        fields = ["id", "question"]  # explicitly excluding 'answer'
-
-
 class QuizQuestionSerializer(serializers.ModelSerializer):
-    flashcard = QuizFlashcardSerializer(read_only=True)
-
     class Meta:
         model = QuizQuestion
         fields = [
             "id",
-            "flashcard",
+            "position",
             "question_text",
             "choices",
             "selected_choice",
@@ -28,33 +19,52 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         if not instance.session.finished_at:
+            ret.pop("selected_choice", None)
             ret.pop("is_correct", None)
             ret.pop("correct_answer", None)
         return ret
 
 
-class QuizSessionSerializer(serializers.ModelSerializer):
+class QuizSessionListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuizSession
+        fields = [
+            "id",
+            "deck",
+            "deck_title",
+            "score",
+            "total_questions",
+            "created_at",
+            "finished_at",
+        ]
+        read_only_fields = fields
+
+
+class QuizSessionDetailSerializer(serializers.ModelSerializer):
     questions = QuizQuestionSerializer(many=True, read_only=True)
 
     class Meta:
         model = QuizSession
         fields = [
             "id",
-            "document",
+            "deck",
+            "deck_title",
             "score",
             "total_questions",
             "created_at",
             "finished_at",
             "questions",
         ]
-        read_only_fields = [
-            "id",
-            "document",
-            "score",
-            "total_questions",
-            "created_at",
-            "finished_at",
-        ]
+        read_only_fields = fields
+
+
+QuizSessionSerializer = QuizSessionDetailSerializer
+
+
+class StartQuizSerializer(serializers.Serializer):
+    question_count = serializers.IntegerField(
+        required=False, default=10, min_value=1, max_value=50
+    )
 
 
 class AnswerSerializer(serializers.Serializer):

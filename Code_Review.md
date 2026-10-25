@@ -138,7 +138,7 @@ This file is the **single source of truth for open work**. It supersedes
   - **Recommended fix:** also give Redis a password (`--requirepass`) and use a matching `REDIS_URL`.
   - **Prompt:** P-08
 
-- [ ] **SEC-09 · P2 · An in-progress quiz exposes `flashcard.id`, so answers can be looked up mid-quiz**
+- [x] **SEC-09 · P2 · An in-progress quiz exposes `flashcard.id`, so answers can be looked up mid-quiz**
   - **Where:** `backend/apps/quizzes/serializers.py` (`QuizFlashcardSerializer` nested in the question).
   - **Acceptable solution:** remove the nested `flashcard` from the quiz-question payload. `question_text`
     is enough. Fixed as part of FEAT-02.
@@ -279,7 +279,7 @@ This file is the **single source of truth for open work**. It supersedes
     Test that PATCH returns 405.
   - **Prompt:** P-02
 
-- [ ] **BUG-12 · P0 · Quiz choices can contain the correct answer twice, or near-identical answers**
+- [x] **BUG-12 · P0 · Quiz choices can contain the correct answer twice, or near-identical answers**
   - **Where:** `backend/apps/quizzes/services.py` `start_quiz()`.
   - **Problem:** distractors are any other card's answers. Identical answer text produces duplicate choices,
     and grading by string equality then marks either one correct. Every card becomes a question (no cap).
@@ -324,7 +324,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - AI generation appends to a deck and dedupes (BUG-06).
   - **Prompt:** P-04
 
-- [ ] **FEAT-02 · P0 · Quizzes start from a deck; the generation rules are improved**
+- [x] **FEAT-02 · P0 · Quizzes start from a deck; the generation rules are improved**
   - **Spec:** `architecture/05-quiz.md` (Status: READY). Test plan Groups 1–3.
   - **Acceptable solution:**
     - `POST /api/v1/decks/{id}/start-quiz/` with `{question_count?}`.
@@ -350,7 +350,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `django_assert_num_queries` test with 1 and 5 documents giving the same count.
   - **Prompt:** P-07
 
-- [ ] **PERF-02 · P1 · The quiz-session list causes N+1 queries and embeds every question**
+- [x] **PERF-02 · P1 · The quiz-session list causes N+1 queries and embeds every question**
   - **Where:** `backend/apps/quizzes/views.py`, `serializers.py`.
   - **Acceptable solution:** list uses a `QuizSessionListSerializer` (no questions); retrieve uses
     `prefetch_related("questions")`. Add a query-count test.

@@ -134,6 +134,8 @@ REST_FRAMEWORK = {
         "auth_verify": "10/min",
         "auth_refresh": "30/min",
         "ai_jobs": "20/day",
+        "quiz_create": "30/hour",
+        "quiz_submit": "30/min",
     },
     "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
     "NUM_PROXIES": env.int("NUM_PROXIES", default=0),
