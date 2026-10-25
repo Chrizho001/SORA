@@ -75,6 +75,33 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 code="summary_not_ready",
             )
 
+        count = request.data.get("count", 10)
+        try:
+            count = int(count)
+            if count < 5 or count > 20:
+                raise ValueError()
+        except (TypeError, ValueError):
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(
+                {"count": ["Count must be an integer between 5 and 20."]},
+                code="invalid_count",
+            )
+
+        from apps.flashcards.models import Deck
+
+        deck = Deck.objects.filter(user=request.user, document=document).first()
+        if not deck:
+            title = document.original_name
+            if title.lower().endswith(".pdf"):
+                title = title[:-4]
+            base_title = title
+            counter = 1
+            while Deck.objects.filter(user=request.user, title__iexact=title).exists():
+                counter += 1
+                title = f"{base_title} ({counter})"
+            deck = Deck.objects.create(user=request.user, title=title, document=document)
+
         from datetime import timedelta
 
         from django.db.models import Q
@@ -103,7 +130,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         from apps.flashcards.tasks import generate_flashcards_task
 
         try:
-            generate_flashcards_task.delay(str(document.id))
+            generate_flashcards_task.delay(str(deck.id), count=count)
         except Exception:
             Document.objects.filter(pk=document.pk).update(
                 flashcard_generation_status=Document.FlashcardGenerationStatus.FAILED,
@@ -111,7 +138,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
             )
             raise
 
-        return Response({"status": "Generating flashcards..."}, status=status.HTTP_202_ACCEPTED)
+        return Response(
+            {"status": "GENERATING", "deck_id": str(deck.id)},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     @action(detail=True, methods=["post"], url_path="start-quiz")
     def start_quiz(self, request, pk=None):

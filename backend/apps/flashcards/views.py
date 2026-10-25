@@ -1,26 +1,36 @@
-from rest_framework import mixins, viewsets
+from django.db import IntegrityError
+from django.db.models import Count
+from rest_framework import mixins, serializers, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-from apps.flashcards.models import Flashcard
-from apps.flashcards.serializers import FlashcardSerializer
+from apps.flashcards.models import Deck, Flashcard
+from apps.flashcards.serializers import DeckSerializer, FlashcardSerializer
 
 
-class FlashcardViewSet(
-    mixins.ListModelMixin,
+class DeckViewSet(
+    mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
-    serializer_class = FlashcardSerializer
+    serializer_class = DeckSerializer
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_queryset(self):
-        qs = Flashcard.objects.filter(user=self.request.user)
+        qs = (
+            Deck.objects.filter(user=self.request.user)
+            .select_related("document")
+            .annotate(card_count=Count("cards"))
+            .order_by("-updated_at")
+        )
         document_id = self.request.query_params.get("document")
         if document_id:
-            from rest_framework import serializers
-
             try:
                 document_id = serializers.UUIDField().to_internal_value(document_id)
                 qs = qs.filter(document_id=document_id)
@@ -29,3 +39,148 @@ class FlashcardViewSet(
                     {"document": ["Invalid UUID format."]}, code="validation_error"
                 )
         return qs
+
+    def perform_create(self, serializer):
+        try:
+            serializer.save(user=self.request.user)
+        except IntegrityError:
+            raise ValidationError(
+                {"title": ["A deck with this title already exists."]},
+                code="deck_title_taken",
+            )
+
+    def perform_update(self, serializer):
+        try:
+            serializer.save()
+        except IntegrityError:
+            raise ValidationError(
+                {"title": ["A deck with this title already exists."]},
+                code="deck_title_taken",
+            )
+
+    def get_throttles(self):
+        if self.action == "generate_flashcards":
+            self.throttle_scope = "ai_jobs"
+        return super().get_throttles()
+
+    @action(detail=True, methods=["post"], url_path="generate-flashcards")
+    def generate_flashcards(self, request, pk=None):
+        from datetime import timedelta
+
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from apps.accounts.exceptions import ConflictError
+        from apps.documents.models import Document
+        from apps.flashcards.tasks import generate_flashcards_task
+
+        deck = self.get_object()
+
+        if not deck.document:
+            raise ValidationError(
+                {"deck": ["Deck does not have a source document."]},
+                code="no_source_document",
+            )
+
+        document = deck.document
+        if document.status != Document.Status.DONE:
+            raise ValidationError(
+                {"document": ["Document summary must be completed before generating flashcards."]},
+                code="summary_not_ready",
+            )
+
+        count = request.data.get("count", 10)
+        try:
+            count = int(count)
+            if count < 5 or count > 20:
+                raise ValueError()
+        except (TypeError, ValueError):
+            raise ValidationError(
+                {"count": ["Count must be an integer between 5 and 20."]},
+                code="invalid_count",
+            )
+
+        now = timezone.now()
+        stale_threshold = now - timedelta(minutes=10)
+
+        claim_filter = Q(pk=document.pk) & (
+            ~Q(flashcard_generation_status=Document.FlashcardGenerationStatus.GENERATING)
+            | Q(flashcard_generation_started_at__lt=stale_threshold)
+        )
+        claimed = Document.objects.filter(claim_filter).update(
+            flashcard_generation_status=Document.FlashcardGenerationStatus.GENERATING,
+            flashcard_generation_started_at=now,
+        )
+
+        if not claimed:
+            raise ConflictError(
+                "Flashcards are already being generated.", code="generation_in_progress"
+            )
+
+        try:
+            generate_flashcards_task.delay(str(deck.id), count=count)
+        except Exception:
+            Document.objects.filter(pk=document.pk).update(
+                flashcard_generation_status=Document.FlashcardGenerationStatus.FAILED,
+                flashcard_generation_started_at=None,
+            )
+            raise
+
+        return Response({"status": "GENERATING"}, status=status.HTTP_202_ACCEPTED)
+
+
+class FlashcardViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    permission_classes = [IsAuthenticated]
+    serializer_class = FlashcardSerializer
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        qs = Flashcard.objects.filter(user=self.request.user)
+        deck_id = self.request.query_params.get("deck")
+        if deck_id:
+            try:
+                deck_id = serializers.UUIDField().to_internal_value(deck_id)
+                qs = qs.filter(deck_id=deck_id)
+            except serializers.ValidationError:
+                raise serializers.ValidationError(
+                    {"deck": ["Invalid UUID format."]}, code="validation_error"
+                )
+
+        document_id = self.request.query_params.get("document")
+        if document_id:
+            try:
+                document_id = serializers.UUIDField().to_internal_value(document_id)
+                qs = qs.filter(document_id=document_id)
+            except serializers.ValidationError:
+                raise serializers.ValidationError(
+                    {"document": ["Invalid UUID format."]}, code="validation_error"
+                )
+        return qs
+
+    def perform_create(self, serializer):
+        from django.utils import timezone
+
+        card = serializer.save(user=self.request.user)
+        Deck.objects.filter(pk=card.deck_id).update(updated_at=timezone.now())
+
+    def perform_update(self, serializer):
+        from django.utils import timezone
+
+        old_deck_id = serializer.instance.deck_id
+        card = serializer.save()
+        new_deck_id = card.deck_id
+        Deck.objects.filter(pk__in=[old_deck_id, new_deck_id]).update(updated_at=timezone.now())
+
+    def perform_destroy(self, instance):
+        from django.utils import timezone
+
+        deck_id = instance.deck_id
+        instance.delete()
+        Deck.objects.filter(pk=deck_id).update(updated_at=timezone.now())

@@ -230,7 +230,7 @@ This file is the **single source of truth for open work**. It supersedes
     `ai_jobs` throttle scope for retry, and enqueue on commit.
   - **Prompt:** P-02
 
-- [ ] **BUG-06 · P0 · Regenerating flashcards deletes every card of the document, including the user's edits**
+- [x] **BUG-06 · P0 · Regenerating flashcards deletes every card of the document, including the user's edits**
   - **Where:** `backend/apps/flashcards/tasks.py` (`Flashcard.objects.filter(document=document).delete()`).
   - **Problem:** with manual cards (FEAT-01) this would destroy user work.
   - **Acceptable solution:** AI generation **appends** to a deck and skips cards whose normalised question
@@ -313,7 +313,7 @@ The owner decided that **flashcards are created manually, grouped into Decks; AI
 optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual-flashcards-and-decks.md`,
 `architecture/04-flashcards.md` and `architecture/05-quiz.md`.
 
-- [ ] **FEAT-01 · P0 · Decks and manual flashcard create, edit and delete (SRS §3.5)**
+- [x] **FEAT-01 · P0 · Decks and manual flashcard create, edit and delete (SRS §3.5)**
   - **Spec:** `architecture/04-flashcards.md` (Status: READY). Test plan Groups 1–4.
   - **Acceptable solution:**
     - A `Deck` model.

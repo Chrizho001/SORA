@@ -118,30 +118,30 @@ deck (`Deck(document=doc)`, title from the file name) and then behaves exactly l
 
 ## 7. Test plan (TDD)
 ### Group 1 — Deck CRUD (`test_api_decks.py`)
-- [ ] POST `/decks/` creates a deck (201) owned by the user
-- [ ] POST with blank title → 400; duplicate title (case-insensitive) → 400 `deck_title_taken`
-- [ ] POST with another user's `document` → 400
-- [ ] GET `/decks/` lists only own decks, includes `card_count`, constant query count for 1 vs 5 decks
-- [ ] PATCH renames; DELETE → 204 and deletes its cards; another user's deck → 404 on GET, PATCH and DELETE
+- [x] POST `/decks/` creates a deck (201) owned by the user
+- [x] POST with blank title → 400; duplicate title (case-insensitive) → 400 `deck_title_taken`
+- [x] POST with another user's `document` → 400
+- [x] GET `/decks/` lists only own decks, includes `card_count`, constant query count for 1 vs 5 decks
+- [x] PATCH renames; DELETE → 204 and deletes its cards; another user's deck → 404 on GET, PATCH and DELETE
 
 ### Group 2 — Manual flashcard CRUD (`test_api_flashcards.py`)
-- [ ] POST `/flashcards/` with own deck → 201, `source=MANUAL`
-- [ ] POST with another user's deck → 400; blank or > 500-char question or answer → 400
-- [ ] GET `/flashcards/?deck=<id>` filters; bad UUID → 400
-- [ ] PATCH edits question and answer; PATCH `deck` to another owned deck moves the card; to a foreign deck → 400
-- [ ] DELETE → 204; another user's card → 404 on GET, PATCH and DELETE
-- [ ] `source` and `document` are read-only (ignored on POST and PATCH)
+- [x] POST `/flashcards/` with own deck → 201, `source=MANUAL`
+- [x] POST with another user's deck → 400; blank or > 500-char question or answer → 400
+- [x] GET `/flashcards/?deck=<id>` filters; bad UUID → 400
+- [x] PATCH edits question and answer; PATCH `deck` to another owned deck moves the card; to a foreign deck → 400
+- [x] DELETE → 204; another user's card → 404 on GET, PATCH and DELETE
+- [x] `source` and `document` are read-only (ignored on POST and PATCH)
 
 ### Group 3 — AI generation into a deck (`test_api_generate.py`, `test_tasks.py`)
-- [ ] Deck without a document → 400 `no_source_document`; document not DONE → 400 `summary_not_ready`
-- [ ] Valid request → 202, status `GENERATING`; second request while generating → 409
-- [ ] Task (mock AI) **appends** cards with `source=AI`; existing manual cards are untouched
-- [ ] Task skips questions already present in the deck (normalised match)
-- [ ] Task failure → status `FAILED`, `FLASHCARDS_FAILED` notification, no raw error text in body or data
-- [ ] Legacy `POST /documents/{id}/generate-flashcards/` creates or reuses the document's deck and returns `deck_id`
+- [x] Deck without a document → 400 `no_source_document`; document not DONE → 400 `summary_not_ready`
+- [x] Valid request → 202, status `GENERATING`; second request while generating → 409
+- [x] Task (mock AI) **appends** cards with `source=AI`; existing manual cards are untouched
+- [x] Task skips questions already present in the deck (normalised match)
+- [x] Task failure → status `FAILED`, `FLASHCARDS_FAILED` notification, no raw error text in body or data
+- [x] Legacy `POST /documents/{id}/generate-flashcards/` creates or reuses the document's deck and returns `deck_id`
 
 ### Group 4 — Migration
-- [ ] Data migration test: a document with cards gets exactly one deck containing them; documents
+- [x] Data migration test: a document with cards gets exactly one deck containing them; documents
       without cards get none
 
 ## 8. Out of scope

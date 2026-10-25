@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from apps.documents.models import Document
-from apps.flashcards.models import Flashcard
+from apps.flashcards.models import Deck, Flashcard
 from apps.quizzes.models import QuizQuestion, QuizSession
 
 
@@ -26,12 +26,17 @@ def document(user):
 
 
 @pytest.fixture
-def four_flashcards(user, document):
+def deck(user, document):
+    return Deck.objects.create(user=user, document=document, title="Quiz Deck")
+
+
+@pytest.fixture
+def four_flashcards(user, document, deck):
     fcs = []
     for i in range(4):
         fcs.append(
             Flashcard.objects.create(
-                user=user, document=document, question=f"Q{i}", answer=f"A{i}"
+                user=user, deck=deck, document=document, question=f"Q{i}", answer=f"A{i}"
             )
         )
     return fcs
@@ -62,8 +67,10 @@ class TestQuizAPI:
         assert "is_correct" not in res.data["questions"][0]
         assert "answer" not in res.data["questions"][0]["flashcard"]
 
-    def test_start_quiz_fails_less_than_4(self, auth_client, document, user):
-        Flashcard.objects.create(user=user, document=document, question="Q1", answer="A1")
+    def test_start_quiz_fails_less_than_4(self, auth_client, document, user, deck):
+        Flashcard.objects.create(
+            user=user, deck=deck, document=document, question="Q1", answer="A1"
+        )
         url = reverse("documents:document-start-quiz", args=[document.id])
         res = auth_client.post(url)
         assert res.status_code == status.HTTP_400_BAD_REQUEST
