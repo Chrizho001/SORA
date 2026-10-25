@@ -1,6 +1,6 @@
 # 02 — Tasks & Schedule
 
-Status: DRAFT
+Status: READY (implemented; Group 4 added 2026-10-25)
 
 ## 1. Purpose
 The Tasks & Schedule system allows students to manage their workload. It unifies both simple to-do items (tasks without deadlines) and scheduled tasks (tasks with deadlines). 
@@ -12,7 +12,8 @@ The Tasks & Schedule system allows students to manage their workload. It unifies
 - FR-2.4 Mark task as completed (§3.2)
 - FR-2.5 Create task with deadline (§3.3)
 - FR-2.6 Assign priority (§3.3)
-- FR-2.7 View tasks by date (§3.3)
+- FR-2.7 View tasks by date (§3.3), in the user's local timezone
+- FR-2.8 Due-soon and overdue reminders (PROJECT_GOAL success criterion 2; delivered via `06-notifications.md`)
 
 ## 3. Data model
 ### `Task`
@@ -24,6 +25,8 @@ The Tasks & Schedule system allows students to manage their workload. It unifies
 - `priority`: IntegerField choices (1=Low, 2=Medium, 3=High) default=2 (Medium)
 - `is_completed`: BooleanField(default=False)
 - `completed_at`: DateTimeField(null=True, blank=True)
+- `reminder_sent_at`: DateTimeField(null=True, blank=True) — set when the due-soon reminder is sent
+- `overdue_notified_at`: DateTimeField(null=True, blank=True) — set when the overdue notice is sent (new)
 - `created_at`: DateTimeField(auto_now_add=True)
 - `updated_at`: DateTimeField(auto_now=True)
 
@@ -38,7 +41,8 @@ Auth: Required (`IsAuthenticated`)
 ### `GET /`
 List tasks for the authenticated user.
 Query params:
-- `date=YYYY-MM-DD` (filters `due_at` by specific date)
+- `date=YYYY-MM-DD` (tasks due on that calendar day)
+- `tz=<IANA zone>` optional, e.g. `Europe/London`; validated with `zoneinfo` (400 on unknown). `date` means that day in `tz` (default UTC). Implemented as a `due_at__gte/__lt` range so the `(user, due_at)` index is used
 - `from=YYYY-MM-DD`, `to=YYYY-MM-DD` (date range filter on `due_at`)
 - `is_completed=true|false`
 - `priority=1|2|3`
@@ -68,6 +72,11 @@ Response: 204 No Content
 - **To-Do vs Schedule:** A task is considered a simple "To-Do" if `due_at` is null.
 - **Completion logic:** If `is_completed` is set to `True`, `completed_at` should automatically be set to the current timestamp. If `is_completed` is set back to `False`, `completed_at` should be set to null.
 - **Ownership:** All requests must be scoped to the authenticated user. A user cannot view, edit, or delete another user's tasks.
+- **Reminders (Celery beat, every 15 min, `send_due_task_reminders`):**
+  - *Due soon:* open tasks with `now < due_at <= now + 24h` and `reminder_sent_at IS NULL` → `TASK_DUE_SOON`, then set `reminder_sent_at`.
+  - *Overdue:* open tasks with `due_at < now` and `overdue_notified_at IS NULL` → `TASK_OVERDUE` once, then set `overdue_notified_at`.
+  - *Re-arming:* when `due_at` changes, or `is_completed` goes from True to False, both `reminder_sent_at` and `overdue_notified_at` are reset to NULL (in `Task.save()`, comparing against the original values captured in `from_db()`, so the API and admin behave the same way).
+  - Notification failures are logged and never abort the loop.
 
 ## 6. Security & permissions
 - All endpoints require authentication (`IsAuthenticated`).
@@ -97,12 +106,19 @@ Response: 204 No Content
 - [x] GET `/?from=YYYY-MM-DD&to=YYYY-MM-DD` filters tasks within a date range
 - [x] Tasks are ordered by `due_at` (ascending) by default, with null `due_at` (to-dos) appearing at the end
 
+### Group 4 — Reminders & timezone (added 2026-10-25)
+- [ ] Due-soon reminder sent once for a task due within 24 h; not for completed or far-future tasks
+- [ ] Changing `due_at` resets `reminder_sent_at`, so the reminder is sent again for the new time
+- [ ] Re-opening a completed task resets reminder flags
+- [ ] Overdue task gets exactly one `TASK_OVERDUE` notification
+- [ ] `?date=2026-10-25&tz=America/New_York` returns a task due at `2026-10-26T02:00Z` (22:00 local) and excludes one due at `2026-10-25T03:00Z`
+- [ ] Unknown `tz` → 400 `validation_error`
+
 ## 8. Out of scope
 - Recurring tasks (v1).
-- Reminders via Web Push API (v1).
+- Per-task custom reminder offsets (v1 uses a fixed 24 h window).
 - Sharing tasks between users.
 - Subjects/tags shared with flashcards (can be added later).
 
 ## 9. Open questions
-- **Timezones:** When filtering by `date=YYYY-MM-DD`, how do we handle timezones? 
-  *Recommendation:* The frontend should send full ISO 8601 strings for `due_at` (in UTC). The `date` filter can either assume UTC, or the frontend can use `from` and `to` with exact ISO datetimes representing the start and end of the user's local day. Using `from` and `to` is more precise for timezone-aware clients.
+- None. Timezone decision: the client sends `tz` (or exact `from`/`to` ISO datetimes); stored times are UTC.

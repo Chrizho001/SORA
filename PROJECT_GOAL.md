@@ -6,8 +6,8 @@
 ## The goal
 
 **Build a secure, reliable, installable web app (PWA) that helps students study more effectively by bringing their
-task planning, reading, and revision into one place, using AI to turn their own study material into summaries,
-flashcards, and quizzes.**
+task planning, reading, and revision into one place. Students write their own flashcards in decks, quiz
+themselves on them, and use AI to summarise their PDFs and suggest extra flashcards.**
 
 This is a final-year project. It must be a **working, demonstrable product** with professional engineering
 quality (tested, secure, documented). A prototype that only runs in the test suite doesn't count.
@@ -15,7 +15,7 @@ quality (tested, secure, documented). A prototype that only runs in the test sui
 ## The problem we are solving
 Students juggle deadlines, long PDFs (lecture notes, papers, readings) and revision across many disconnected tools. Turning a
 50-page PDF into something they can revise from takes hours. Planning *when* to study is a separate chore.
-Revision tools usually need cards to be written by hand.
+Writing good revision cards takes time, and nothing tells you which cards you still get wrong.
 
 ## Who it is for
 - **Primary users:** students, mostly on their phones and sometimes on laptops, with ordinary web-browsing skills.
@@ -27,8 +27,11 @@ A student can, end to end, on their phone:
 2. **Plan their work:** add tasks with deadlines and priorities, see what is due by date, tick things off, and get
    reminded before deadlines.
 3. **Upload a PDF** and get back a clear, accurate **AI summary** within a reasonable time, with a notification when it's ready.
-4. **Generate flashcards** from that material, then review and edit them.
-5. **Take a quiz** built from their flashcards and see their score and which answers were right or wrong.
+4. **Create flashcards** in a deck (a subject), edit and delete them, and optionally ask the AI to
+   suggest extra cards from an uploaded PDF. The suggestions are added to the deck, never replacing the
+   student's own cards.
+5. **Take a quiz** built from a deck and see their score and which answers were right or wrong, with past
+   results kept in a history.
 6. **Install the app** to their home screen and open the app shell even when offline.
 
 ## Product scope
@@ -38,8 +41,8 @@ A student can, end to end, on their phone:
 | Authentication | Email/password with email verification, Google sign-in, logout, password reset and change, profile | §3.1 |
 | Tasks & schedule | Add, edit, delete and complete tasks; deadlines; priority; view by date; due-soon reminders | §3.2, §3.3 |
 | PDF summary | Upload a PDF, extract text, AI summary, display it; runs asynchronously | §3.4 |
-| Flashcards | Create, edit, delete; view by subject/document; AI generation from a summary | §3.5 |
-| Quiz | Start a quiz from flashcards, answer questions, see score and results history | §3.6 |
+| Flashcards & decks | Create, edit, delete cards **manually**; organise them in decks (= subjects); optional AI suggestions from a PDF summary, appended to a deck | §3.5, ADR 0003 |
+| Quiz | Start a quiz from a deck (choose the number of questions), answer, see score, per-question review and results history | §3.6 |
 | Notifications | In-app and web push for summaries ready, quiz results, task reminders, security events; user preferences | supports all of the above |
 
 **Platform:** a **Progressive Web App** (Next.js frontend) backed by a **Django REST Framework API** with
@@ -47,7 +50,7 @@ A student can, end to end, on their phone:
 
 ## Out of scope (for this project)
 Native iOS/Android apps · collaboration or sharing between students · payments · teacher/admin dashboards ·
-non-PDF documents · social providers other than Google · offline AI features.
+non-PDF documents · social providers other than Google · offline AI features · sharing or importing decks.
 
 ## Quality bar (non-negotiable)
 These come from the SRS non-functional requirements and the project's engineering rules. A feature isn't finished
@@ -67,18 +70,51 @@ until it meets all of them.
    spec disagree, update the spec first.
 2. **Test first:** red → green → refactor, following each spec's test plan.
 3. **Review before calling it done:** security, performance and spec conformance are checked. Open findings
-   are tracked in `docs/reviews/`.
+   are tracked in `Code_Review.md`.
 
-## Where we are now (2026-10-11)
-- **Backend:** all systems implemented, 130 passing tests. The critical security findings from
-  `docs/reviews/2026-10-08-backend-review.md` are fixed and verified. Regressions and partial fixes remain open
-  (see the review's "Re-verification" section). **Closing that review is the current priority.**
-- **AI:** there is **no AI API access yet**. PDF summaries and AI-generated flashcards and quizzes run on a mock
-  provider until access is available. Manual flashcard creation is what gives quizzes real content in the meantime.
-- **Frontend:** the Next.js PWA hasn't been built yet.
+## Where we are now (2026-10-25)
+**Delivery: 2026-10-26.** The plan for the remaining day is `Code_Review.md` (one checkbox per item),
+executed with the prompts in `docs/reviews/AGENT_PROMPTS.md` in order, **P0 first**.
+
+- **Backend:** all systems are implemented on `main` (171 passing tests, 93% coverage). Open items
+  include:
+  - a quiz score-inflation bug
+  - the Google auto-link takeover risk
+  - document-pipeline idempotency and retry
+  - missing throttles
+  - `PATCH /auth/me/`
+  - 250 `ruff` errors
+- **AI:** real provider in place: Google Gemini (`AI_PROVIDER=gemini`); `mock` is used in tests only.
+- **Flashcards (scope change 2026-10-25):** cards are now created manually and grouped into **decks**.
+  AI generation stays as an optional add-on, and quizzes run on decks (ADR 0003, specs 04/05 rewritten).
+  This still has to be implemented.
+- **Frontend:** the Next.js app is built (landing page, auth, dashboard with tasks, documents, flashcards,
+  quizzes, notifications). Still missing:
+  - **The PWA layer** (manifest, service worker, offline shell).
+  - Robust session refresh, and clearing the cache on logout.
+  - Real routes.
+  - Deck and card CRUD, task edit, profile and password, notification preferences.
+- **Deployment:** not yet deployed over HTTPS.
 
 ## Definition of "project complete"
 - [ ] Every SRS §3 feature works end to end in the PWA against the real backend, with the real AI provider
 - [ ] All review findings are closed and the quality bar above is met
 - [ ] The app is deployed over HTTPS and installable on a phone
 - [ ] The documentation (SRS, architecture specs, ADRs) matches what was built
+- [ ] Every **P0** item in `Code_Review.md` is ticked
+
+## Stretch goals (only after all P0 items; these make the project stand out)
+1. **Spaced repetition:** an SM-2 schedule per card (`ease`, `interval`, `due_at`) and a "Due today"
+   review queue on the dashboard. Quiz results feed into it.
+2. **Adaptive quizzes:** weight question selection toward cards the student previously got wrong, and
+   offer "Retake my mistakes".
+3. **Real progress analytics:** a study streak and an activity chart computed from quiz and review
+   history (no placeholder numbers).
+4. **Study planner:** suggest review sessions on the calendar before task deadlines that are linked to a
+   deck.
+5. **Engineering showcase:**
+   - OpenAPI docs (`drf-spectacular`) at `/api/docs/`
+   - GitHub Actions CI badge
+   - Lighthouse report (PWA, Accessibility ≥ 90)
+   - Playwright smoke test video
+   - a live HTTPS URL with a QR code for examiners

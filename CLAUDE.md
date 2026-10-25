@@ -2,7 +2,8 @@
 
 Final-year project. A study assistant that helps students manage tasks, summarise PDFs, and study with flashcards and quizzes.
 
-Read `PROJECT_GOAL.md` first; open review findings are in `docs/reviews/`.
+Read `PROJECT_GOAL.md` first. **All open work is tracked in `Code_Review.md`** (one checkbox per finding);
+copy-paste agent prompts for it are in `docs/reviews/AGENT_PROMPTS.md`.
 
 ## Platform (read first)
 This is a **Progressive Web App (PWA)**, not a native mobile app. It is an installable, mobile-first,
@@ -20,11 +21,12 @@ Study_Assistant_SRS.md        ← original requirements (source of FR/NFR IDs)
 architecture/                 ← one spec per system; THE source of truth for building it
   00-overview.md              ← system context, app map, cross-cutting conventions
   01-authentication.md        ← auth spec (status: ready)
-  02-tasks.md … 05-quiz.md    ← stubs until specced
-  adr/                        ← architecture decision records
+  02-tasks.md … 06-notifications.md  ← system specs (all READY; 04/05 rewritten 2026-10-25)
+  adr/                        ← architecture decision records (0003: manual flashcards + decks)
 docs/design-inspiration/      ← UI mood references for the frontend
 backend/                      ← Django + DRF API
-frontend/                     ← Next.js PWA (not scaffolded yet)
+frontend/                     ← Next.js PWA (App Router)
+Code_Review.md                ← the open-work tracker (tick boxes when merged + green)
 ```
 
 ## Stack
@@ -34,7 +36,10 @@ frontend/                     ← Next.js PWA (not scaffolded yet)
 - **Database:** PostgreSQL 16 (via `docker-compose.yml`). Tests also run against Postgres.
 - **Testing:** pytest, pytest-django, factory_boy, pytest-cov, freezegun.
 - **Lint/format:** ruff.
-- **Frontend:** Next.js (App Router, TypeScript), Serwist for service worker/PWA manifest.
+- **Async:** Celery 5 + Redis 7 (worker + beat). AI provider: Google Gemini behind `get_summarizer()` /
+  `get_flashcard_generator()` (`AI_PROVIDER=mock` in tests).
+- **Frontend:** Next.js (App Router, TypeScript), TanStack Query, Serwist for service worker/PWA manifest,
+  Playwright for end-to-end smoke tests.
 
 ## Workflow — spec-first, test-driven
 1. **Read the spec** in `architecture/<NN>-<system>.md` before touching code for that system.
@@ -75,12 +80,14 @@ frontend/                     ← Next.js PWA (not scaffolded yet)
 
 ## Commands
 ```bash
-docker compose up -d db                       # start Postgres
+docker compose up -d db redis                 # start Postgres + Redis
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements/dev.txt
 python manage.py migrate
 python manage.py runserver                    # http://localhost:8000
+celery -A config worker -l info               # second terminal (AI jobs, push)
+celery -A config beat -l info                 # third terminal (task reminders)
 pytest                                        # full suite
 pytest apps/accounts -x -q                    # one app, stop on first failure
 pytest --cov=apps --cov-report=term-missing   # coverage
@@ -93,5 +100,9 @@ ruff check . && ruff format .
   lives in memory; the refresh token is an httpOnly cookie (see `01-authentication.md`).
 - Don't change the custom user model's identity fields without a migration plan.
 - Don't add a dependency without adding it to `requirements/*.txt` and noting why in the PR/commit.
+- Email links are built **only** from `settings.FRONTEND_URL`, never from request headers.
+- Never run `config.settings.dev` on a public URL (tunnels included). Use `prod` (or `demo`, which is
+  derived from `prod`).
+- User-visible error messages never include raw exception or provider text. Log the details instead.
 - Keep responses within the SRS NFR budget (≤ 2–3 s). Long-running work (e.g. PDF summarisation)
   must be asynchronous. It is specced in `03-pdf-summary.md`.

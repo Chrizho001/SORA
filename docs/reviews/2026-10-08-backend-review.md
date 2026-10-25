@@ -1,3 +1,6 @@
+> **Superseded (2026-10-25).** Every finding that is still open has been re-verified against `main` and carried into
+> [`/Code_Review.md`](../../Code_Review.md). That file is now the only tracker. This document is kept for history.
+
 # Backend Review: 2026-10-08
 
 **Scope:** everything in `backend/` at commit `8bb45b1` (auth, tasks, documents, flashcards, quizzes, notifications).

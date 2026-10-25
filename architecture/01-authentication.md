@@ -145,7 +145,7 @@ Request: `{ "email": "ADA@uni.edu ", "password": "..." }` (the email is normalis
 Updates `last_login`. A Google-only user (unusable password) trying a password login gets
 401 `invalid_credentials`, the same as a wrong password.
 
-### POST `google/` — `accounts:google-login` — AllowAny, throttle `auth_login`
+### POST `google/` — `accounts:google` (implemented name) — AllowAny, throttle `auth_login`
 The PWA obtains a Google **ID token** from Google Identity Services ("Sign in with Google" button /
 One Tap) and posts it here. This single endpoint handles both sign-up and login.
 
@@ -165,8 +165,12 @@ Request: `{ "credential": "<google id token (JWT)>" }`
 
 Resolution algorithm (`services.google_login(claims) -> (user, created)`), inside a transaction:
 1. Look up `SocialAccount(provider="google", provider_uid=sub)`. If found → that user.
-2. Otherwise look up a user by normalised `email`. If found → create a `SocialAccount` link and set
-   `is_email_verified=True` (Google has verified the inbox).
+2. Otherwise look up a user by normalised `email`. If found → create a `SocialAccount` link.
+   - If the user was **already verified**: keep their password (they can log in both ways).
+   - If the user was **unverified**: whoever registered that password never proved they own the inbox,
+     so call `set_unusable_password()`, blacklist all of the user's outstanding refresh tokens, then set
+     `is_email_verified=True`. This prevents a pre-registration takeover, where an attacker registers the
+     victim's email first. The rightful owner can add a password later via password reset.
 3. Otherwise → create a user: `email`, `first_name=given_name or ""`, `last_name=family_name or ""`,
    `is_email_verified=True`, unusable password, plus a `SocialAccount`. Do **not** send a verification email.
 4. Update `SocialAccount.email`, `extra_data`, `last_login_at` and `user.last_login`.
@@ -207,7 +211,7 @@ Resetting a password also marks the email as verified, because the user proved t
   and `date_joined` are **read-only** and silently ignored.
 - 401 `not_authenticated` / `token_not_valid` without a valid Bearer token.
 
-### POST `password-change/` — `accounts:password-change` — IsAuthenticated
+### POST `password/change/` — `accounts:password-change` (implemented path) — IsAuthenticated
 Request: `{ "old_password", "new_password", "new_password_confirm" }`
 | Status | When |
 |--------|------|
@@ -228,12 +232,17 @@ Request: `{ "old_password", "new_password", "new_password_confirm" }`
    routes built from `settings.FRONTEND_URL`:
    - `{FRONTEND_URL}/verify-email?token=<token>`
    - `{FRONTEND_URL}/reset-password?uid=<uidb64>&token=<token>`
+
+   Links are **always** built from `settings.FRONTEND_URL` and **never** from request headers
+   (`Origin`, `Referer`, `Host`, `X-Forwarded-Host`). Building them from headers lets an attacker get a
+   genuine email that sends the victim's reset token to the attacker's site.
 6. Any password change (reset or change) blacklists all of the user's outstanding refresh tokens.
 7. Access tokens carry `user_id` (UUID) as the subject claim. No PII beyond that.
 8. **Google accounts:** one Google identity maps to exactly one user. A user can have both a
    password and a linked Google account and log in either way.
 9. Auto-linking a Google identity to an existing email account happens only when Google asserts
-   `email_verified=true`. This also verifies a previously unverified password account.
+   `email_verified=true`. Linking to a previously **unverified** password account verifies it **and
+   removes its password** (see the resolution algorithm in §4, step 2) and revokes its sessions.
 10. Google sign-in never overwrites names a user has already set. Names are only filled in on user creation.
 11. Registering with email/password using an email that already exists (including a Google-created
     account) → 400 duplicate. The user should sign in with Google, or use password reset to add a password.
@@ -389,8 +398,8 @@ Files: `apps/accounts/tests/`. Fixtures in `backend/conftest.py`: `api_client`, 
 ### Group 8 — Profile (`test_api_me.py`)
 - [x] unauthenticated GET → 401
 - [x] GET → 200 `UserSerializer` for the requesting user
-- [x] PATCH names → 200, persisted
-- [x] PATCH `email` / `is_email_verified` → ignored (unchanged in the DB)
+- [ ] PATCH names → 200, persisted *(was ticked but not implemented on `main` — re-opened 2026-10-25, Code_Review FEAT-03)*
+- [ ] PATCH `email` / `is_email_verified` → ignored (unchanged in the DB) *(re-opened, FEAT-03)*
 - [x] an expired access token (freezegun, > 15 min) → 401
 
 ### Group 9 — Password change (`test_api_password_change.py`)
@@ -413,6 +422,7 @@ Fake claims fixture: `{"sub": "1234567890", "email": "ada@gmail.com", "email_ver
 - [x] returning Google user (same `sub`) → 200, `created: false`, no duplicate user or link
 - [x] existing password user with the same email (any case) → 200, Google linked, `is_email_verified` becomes True, password still works
 - [x] existing **unverified** password user → linked and now verified
+- [ ] existing **unverified** password user → after Google link `has_password` is false, the old password no longer logs in, and old refresh tokens are blacklisted (Code_Review SEC-01)
 - [x] names are not overwritten for an existing user
 - [x] missing `family_name` → user created with `last_name=""`
 - [x] `email_verified=false` → 401 `google_email_unverified`, no user created
@@ -430,6 +440,9 @@ Fake claims fixture: `{"sub": "1234567890", "email": "ada@gmail.com", "email_ver
 ### Group 11 — Cross-cutting
 - [x] the exception handler produces the envelope for 401/403/404/429 as well as 400
 - [x] the CORS preflight from `FRONTEND_URL` is allowed with credentials; another origin is not allowed
+- [ ] register and password-reset with `Origin: https://evil.example` and `Referer: https://evil.example/x` → emailed link starts with `FRONTEND_URL` (Code_Review SEC-12)
+- [ ] `verify-email/`, `token/refresh/`, `password-reset/confirm/` are throttled (`auth_verify` 10/min, `auth_refresh` 30/min, `auth_password` 10/min) (Code_Review SEC-02)
+- [ ] no log record contains a user's email address (Code_Review SEC-06)
 
 ## 8. Out of scope (v1)
 - Social providers other than Google (the `SocialAccount` model allows adding them later).
@@ -440,5 +453,6 @@ Fake claims fixture: `{"sub": "1234567890", "email": "ada@gmail.com", "email_ver
 
 ## 9. Open questions
 - Production email provider (SMTP vs. a transactional service). This only affects `prod.py` settings.
-- Production domain layout (subdomain vs. Next.js rewrite proxy). Either works under §6.
+- ~~Production domain layout~~ **Decided 2026-10-25:** the Next.js app proxies `/api/v1/*` to Django
+  (same origin), so the `SameSite=Lax` refresh cookie is always first-party. See `00-overview.md` "Deployment".
 - Should we store the Google profile picture URL and show it as the avatar? (Currently it's only kept in `extra_data`.)
