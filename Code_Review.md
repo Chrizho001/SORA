@@ -237,7 +237,7 @@ This file is the **single source of truth for open work**. It supersedes
     already exists in that deck. Fixed as part of FEAT-01.
   - **Prompt:** P-04
 
-- [ ] **BUG-07 · P1 · Task reminders never fire again after a task is rescheduled or reopened; overdue is never sent**
+- [x] **BUG-07 · P1 · Task reminders never fire again after a task is rescheduled or reopened; overdue is never sent**
   - **Where:** `backend/apps/notifications/tasks.py` `send_due_task_reminders`; `backend/apps/tasks/serializers.py` / model.
   - **Problem:** `reminder_sent_at` is never cleared when `due_at` changes or a task is re-opened.
     `TASK_OVERDUE` exists but is never emitted.
@@ -246,7 +246,7 @@ This file is the **single source of truth for open work**. It supersedes
     `TASK_OVERDUE` once per task.
   - **Prompt:** P-06 (spec: `architecture/02-tasks.md` §5, Group 4)
 
-- [ ] **BUG-08 · P1 · `?date=` filters by UTC day, so evening tasks show on the wrong day**
+- [x] **BUG-08 · P1 · `?date=` filters by UTC day, so evening tasks show on the wrong day**
   - **Where:** `backend/apps/tasks/views.py` (`due_at__date`).
   - **Acceptable solution:** accept an optional `tz` (IANA name, validated with `zoneinfo`). Convert `date`
     to the `[local midnight, next local midnight)` range in that zone and filter with `due_at__gte/__lt`,

@@ -1,20 +1,26 @@
+from datetime import UTC, timedelta
+
 import pytest
 from django.urls import reverse
-from rest_framework import status
-from apps.tasks.models import Task
 from django.utils import timezone
-from datetime import timedelta
+from rest_framework import status
+
+from apps.tasks.models import Task
+
 
 @pytest.fixture
 def auth_client(api_client, user):
     from rest_framework_simplejwt.tokens import RefreshToken
+
     refresh = RefreshToken.for_user(user)
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
 
+
 @pytest.fixture
 def task(user):
     return Task.objects.create(user=user, title="My Task")
+
 
 @pytest.mark.django_db
 class TestTaskCRUD:
@@ -40,9 +46,10 @@ class TestTaskCRUD:
     def test_list_tasks_returns_paginated_owned_tasks(self, auth_client, user):
         Task.objects.create(user=user, title="Task 1")
         Task.objects.create(user=user, title="Task 2")
-        
+
         # Create task for another user
         from django.contrib.auth import get_user_model
+
         other_user = get_user_model().objects.create_user(email="other@test.com", password="pwd")
         Task.objects.create(user=other_user, title="Other Task")
 
@@ -61,9 +68,10 @@ class TestTaskCRUD:
 
     def test_retrieve_unowned_task_returns_404(self, auth_client, user):
         from django.contrib.auth import get_user_model
+
         other_user = get_user_model().objects.create_user(email="other@test.com", password="pwd")
         other_task = Task.objects.create(user=other_user, title="Other Task")
-        
+
         url = reverse("tasks:task-detail", args=[other_task.id])
         res = auth_client.get(url)
         assert res.status_code == status.HTTP_404_NOT_FOUND
@@ -82,25 +90,71 @@ class TestTaskCRUD:
         assert res.status_code == status.HTTP_204_NO_CONTENT
         assert not Task.objects.filter(id=task.id).exists()
 
+    def test_put_task_returns_405_method_not_allowed(self, auth_client, task):
+        url = reverse("tasks:task-detail", args=[task.id])
+        res = auth_client.put(url, {"title": "Replaced Title"}, format="json")
+        assert res.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+    def test_patch_due_at_clears_reminder_flags(self, auth_client, user):
+        now = timezone.now()
+        task = Task.objects.create(
+            user=user,
+            title="Assignment",
+            due_at=now,
+            reminder_sent_at=now,
+            overdue_notified_at=now,
+        )
+        url = reverse("tasks:task-detail", args=[task.id])
+        new_due = (now + timedelta(days=2)).isoformat()
+        res = auth_client.patch(url, {"due_at": new_due}, format="json")
+        assert res.status_code == status.HTTP_200_OK
+
+        task.refresh_from_db()
+        assert task.reminder_sent_at is None
+        assert task.overdue_notified_at is None
+
+    def test_patch_reopen_clears_reminder_flags(self, auth_client, user):
+        now = timezone.now()
+        task = Task.objects.create(
+            user=user,
+            title="Assignment",
+            due_at=now,
+            is_completed=True,
+            completed_at=now,
+            reminder_sent_at=now,
+            overdue_notified_at=now,
+        )
+        url = reverse("tasks:task-detail", args=[task.id])
+        res = auth_client.patch(url, {"is_completed": False}, format="json")
+        assert res.status_code == status.HTTP_200_OK
+
+        task.refresh_from_db()
+        assert task.is_completed is False
+        assert task.completed_at is None
+        assert task.reminder_sent_at is None
+        assert task.overdue_notified_at is None
+
+
 @pytest.mark.django_db
 class TestCompletionLogic:
     def test_completion_updates_completed_at(self, auth_client, task):
         url = reverse("tasks:task-detail", args=[task.id])
         assert task.completed_at is None
-        
+
         res = auth_client.patch(url, {"is_completed": True}, format="json")
         assert res.status_code == status.HTTP_200_OK
-        
+
         task.refresh_from_db()
         assert task.is_completed is True
         assert task.completed_at is not None
-        
+
         res = auth_client.patch(url, {"is_completed": False}, format="json")
         assert res.status_code == status.HTTP_200_OK
-        
+
         task.refresh_from_db()
         assert task.is_completed is False
         assert task.completed_at is None
+
 
 @pytest.mark.django_db
 class TestFilteringAndOrdering:
@@ -112,7 +166,13 @@ class TestFilteringAndOrdering:
         # open task, due today
         Task.objects.create(user=user, title="Task 1", due_at=now, priority=1)
         # completed task, due tomorrow
-        Task.objects.create(user=user, title="Task 2", due_at=now + timedelta(days=1), is_completed=True, priority=3)
+        Task.objects.create(
+            user=user,
+            title="Task 2",
+            due_at=now + timedelta(days=1),
+            is_completed=True,
+            priority=3,
+        )
         # open task, no due date (to-do)
         Task.objects.create(user=user, title="Task 3", due_at=None, priority=2)
         # open task, due yesterday
@@ -150,7 +210,30 @@ class TestFilteringAndOrdering:
         res = auth_client.get(self.url)
         results = res.data["results"]
         # order should be due_at ascending, nulls last
-        assert results[0]["title"] == "Task 4" # yesterday
-        assert results[1]["title"] == "Task 1" # today
-        assert results[2]["title"] == "Task 2" # tomorrow
-        assert results[3]["title"] == "Task 3" # null due_at (last)
+        assert results[0]["title"] == "Task 4"  # yesterday
+        assert results[1]["title"] == "Task 1"  # today
+        assert results[2]["title"] == "Task 2"  # tomorrow
+        assert results[3]["title"] == "Task 3"  # null due_at (last)
+
+    def test_filter_by_date_with_timezone(self, auth_client, user):
+        from datetime import datetime
+
+        # Task A: 2026-10-26T02:00:00Z (which is 2026-10-25 22:00:00 in America/New_York)
+        due_a = datetime(2026, 10, 26, 2, 0, 0, tzinfo=UTC)
+        # Task B: 2026-10-25T03:00:00Z (which is 2026-10-24 23:00:00 in America/New_York)
+        due_b = datetime(2026, 10, 25, 3, 0, 0, tzinfo=UTC)
+
+        task_a = Task.objects.create(user=user, title="NY Oct 25 Task", due_at=due_a)
+        task_b = Task.objects.create(user=user, title="NY Oct 24 Task", due_at=due_b)
+
+        res = auth_client.get(f"{self.url}?date=2026-10-25&tz=America/New_York")
+        assert res.status_code == status.HTTP_200_OK
+        ids = [t["id"] for t in res.data["results"]]
+        assert str(task_a.id) in ids
+        assert str(task_b.id) not in ids
+
+    def test_filter_by_invalid_timezone_returns_400(self, auth_client):
+        res = auth_client.get(f"{self.url}?tz=Mars/Base")
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert res.data["code"] == "validation_error"
+        assert "tz" in res.data["errors"]
