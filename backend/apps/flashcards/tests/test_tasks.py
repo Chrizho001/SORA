@@ -58,3 +58,18 @@ class TestGenerateFlashcardsTask:
         document.refresh_from_db()
         assert document.flashcard_generation_status == Document.FlashcardGenerationStatus.FAILED
         assert Flashcard.objects.filter(document=document).count() == 0
+
+        from apps.notifications.models import NotificationType
+
+        mock_notify.assert_called_once()
+        call_kwargs = mock_notify.call_args.kwargs
+        assert call_kwargs["notification_type"] == NotificationType.FLASHCARDS_FAILED
+        assert call_kwargs["title"] == "Flashcards Failed"
+        assert (
+            call_kwargs["body"]
+            == f"We couldn't generate flashcards for '{document.original_name}'. Please try again."
+        )
+        assert call_kwargs["data"] == {
+            "document_id": str(document.id),
+            "error": "flashcards_generation_failed",
+        }

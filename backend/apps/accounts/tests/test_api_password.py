@@ -89,8 +89,9 @@ class TestChangePasswordAPI:
 
     def test_password_change_invalidates_all_refresh_tokens(self, api_client, user, password):
         from django.conf import settings
+
         refresh = RefreshToken.for_user(user)
-        
+
         api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
         payload = {
             "old_password": password,
@@ -98,12 +99,42 @@ class TestChangePasswordAPI:
             "password_confirm": "New!Password123",
         }
         api_client.post(self.url, payload, format="json")
-        
+
         # Try to use old refresh token
         refresh_url = reverse("accounts:token-refresh")
-        api_client.credentials() # clear access token
+        api_client.credentials()  # clear access token
         api_client.cookies[settings.AUTH_REFRESH_COOKIE_NAME] = str(refresh)
-        
+
         response = api_client.post(refresh_url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_password_change_succeeds_when_push_dispatch_fails(
+        self, api_client, user, password, django_capture_on_commit_callbacks, monkeypatch
+    ):
+        from unittest.mock import MagicMock
+
+        from kombu.exceptions import OperationalError
+
+        from apps.notifications.models import Notification, NotificationType
+
+        mock_delay = MagicMock(side_effect=OperationalError("RabbitMQ / Redis down"))
+        monkeypatch.setattr("apps.notifications.tasks.send_web_push_task.delay", mock_delay)
+
+        refresh = RefreshToken.for_user(user)
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+
+        payload = {
+            "old_password": password,
+            "password": "New!Password123",
+            "password_confirm": "New!Password123",
+        }
+
+        with django_capture_on_commit_callbacks(execute=True):
+            response = api_client.post(self.url, payload, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "access" in response.data
+        assert Notification.objects.filter(
+            recipient=user,
+            type=NotificationType.SECURITY_PASSWORD_CHANGED,
+        ).exists()

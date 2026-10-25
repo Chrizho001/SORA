@@ -55,7 +55,7 @@ def test_mock_summarizer_returns_mock_model_name():
 def test_summarizer_client_without_api_key_raises_error(settings):
     settings.AI_API_KEY = ""
     client = SummarizerClient(api_key="")
-    with pytest.raises(DocumentProcessingError, match="AI_API_KEY"):
+    with pytest.raises(DocumentProcessingError, match="AI service authentication failed"):
         client.summarize("Sample text")
 
 

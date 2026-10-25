@@ -38,7 +38,26 @@ def _notify_failure(document: Document) -> None:
         logger.error("Failed to notify failure for doc %s: %s", document.id, e)
 
 
+SAFE_DOCUMENT_ERRORS = {
+    "PDF is encrypted with a password and cannot be processed.",
+    (
+        "No text could be extracted from this PDF, and visual analysis could not read it. "
+        "Please ensure the PDF is clear and readable."
+    ),
+    "AI service error. Please try again later.",
+    "AI rate limit reached. Please wait a moment and try again.",
+    "AI service is busy. Please try again shortly.",
+    "Network error contacting AI service. Please try again later.",
+    "AI service authentication failed.",
+}
+
+
 def _handle_failure(document_id: str, safe_message: str) -> None:
+    error_msg = (
+        safe_message
+        if safe_message in SAFE_DOCUMENT_ERRORS or safe_message.startswith("PDF is too long")
+        else "We couldn't process this PDF. Please try again."
+    )
     try:
         with transaction.atomic():
             try:
@@ -50,7 +69,7 @@ def _handle_failure(document_id: str, safe_message: str) -> None:
                 return
 
             doc.status = Document.Status.FAILED
-            doc.error_message = safe_message
+            doc.error_message = error_msg
             doc.processing_started_at = None
             doc.save(update_fields=["status", "error_message", "processing_started_at"])
 

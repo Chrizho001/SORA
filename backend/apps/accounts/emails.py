@@ -7,7 +7,7 @@ attaching inline graphics via standard MIME Content-ID (CID).
 import logging
 from email.mime.image import MIMEImage
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -21,9 +21,10 @@ ASSETS_DIR = Path(__file__).resolve().parent / "static" / "accounts" / "email"
 def send_templated_email(
     subject: str,
     template_prefix: str,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     recipient_email: str,
     mascot_filename: str = "sora_mascot_welcome.png",
+    user_id: Any | None = None,
 ) -> None:
     """
     Render and dispatch a multipart HTML + Plain Text email with inline CID image attachments.
@@ -78,4 +79,7 @@ def send_templated_email(
             logger.warning("Failed to attach inline mascot to email: %s", e)
 
     message.send(fail_silently=False)
-    logger.info("Templated email '%s' successfully sent to %s", subject, recipient_email)
+    if user_id:
+        logger.info("Templated email '%s' successfully sent to user_id=%s", subject, user_id)
+    else:
+        logger.info("Templated email '%s' successfully sent", subject)

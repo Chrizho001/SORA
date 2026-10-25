@@ -102,7 +102,7 @@ This file is the **single source of truth for open work**. It supersedes
     (12 MB). Test it with a fake `CONTENT_LENGTH` header.
   - **Prompt:** P-01
 
-- [ ] **SEC-05 · P0 · Internal error text leaks to users**
+- [x] **SEC-05 · P0 · Internal error text leaks to users**
   - **Where:** `backend/apps/documents/tasks.py` (the generic `except` writes
     `f"We couldn't process this PDF. {str(e)}"`); `backend/apps/documents/ai.py` and `backend/apps/flashcards/ai.py`
     (`f"... error: {exc}"`, `f"Google Gemini API error ({status_code}): {err_msg}"`, auth-failure text);
@@ -116,7 +116,7 @@ This file is the **single source of truth for open work**. It supersedes
     containing `"SECRET-INTERNAL"` never appears in `error_message`, in the notification `body`, or in `data`.
   - **Prompt:** P-03
 
-- [ ] **SEC-06 · P1 · Email addresses are written to logs**
+- [x] **SEC-06 · P1 · Email addresses are written to logs**
   - **Where:** `backend/apps/accounts/services.py:68` and `:390` (`user.email`);
     `backend/apps/accounts/emails.py:81` (`recipient_email`).
   - **Acceptable solution / recommended fix:** log `user_id` only. Add a test with `caplog` asserting the email
@@ -187,7 +187,7 @@ This file is the **single source of truth for open work**. It supersedes
     the service. Tests cover the duplicate, foreign, invalid-choice, partial and empty submissions.
   - **Prompt:** P-02
 
-- [ ] **BUG-02 · P0 · The flashcard-failure notification uses the wrong type and leaks errors**
+- [x] **BUG-02 · P0 · The flashcard-failure notification uses the wrong type and leaks errors**
   - **Where:** `backend/apps/flashcards/tasks.py` (failure branch).
   - **Problem:**
     - It sends `PDF_SUMMARY_FAILED`.
@@ -253,7 +253,7 @@ This file is the **single source of truth for open work**. It supersedes
     which also uses the index. Without `tz`, fall back to UTC.
   - **Prompt:** P-06
 
-- [ ] **BUG-09 · P0 · A Redis outage turns a successful password change into a 500**
+- [x] **BUG-09 · P0 · A Redis outage turns a successful password change into a 500**
   - **Where:** `backend/apps/notifications/notification_service.py` (`send_web_push_task.delay()` called
     synchronously).
   - **Problem:** `change_password` and `confirm_password_reset` call `notify`. If the broker is down, the
@@ -263,7 +263,7 @@ This file is the **single source of truth for open work**. It supersedes
     `try/except` that logs. The in-app `Notification` row is still created.
   - **Prompt:** P-03
 
-- [ ] **BUG-10 · P1 · Email is sent synchronously with no timeout**
+- [x] **BUG-10 · P1 · Email is sent synchronously with no timeout**
   - **Where:** `backend/apps/accounts/services.py` (`on_commit(send_…)` runs in the request thread);
     settings (no `EMAIL_TIMEOUT`).
   - **Problem:** a slow SMTP or Resend server hangs register and reset, which breaks the NFR 2–3 s budget.

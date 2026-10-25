@@ -34,8 +34,7 @@ def register_user(email: str, password: str, first_name: str, last_name: str) ->
         last_name=last_name,
     )
     logger.info("User registered via email: user_id=%s", user.id)
-
-    transaction.on_commit(lambda: send_verification_email(user))
+    send_verification_email(user)
 
     return user
 
@@ -46,26 +45,33 @@ def send_verification_email(user: User) -> None:
 
     Architecture ref: 01-authentication.md §5 (Business rules #5).
     """
-    from .emails import send_templated_email
+    from .tasks import send_templated_email_task
 
     token = dumps({"uid": str(user.id)}, salt="accounts.verify-email")
     verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
     subject = "Verify your email — SORA"
+    context = {
+        "first_name": user.first_name,
+        "verification_url": verification_url,
+    }
+    user_id = str(user.id)
+    recipient_email = user.email
 
-    try:
-        send_templated_email(
-            subject=subject,
-            template_prefix="accounts/email/verify_email",
-            context={
-                "first_name": user.first_name,
-                "verification_url": verification_url,
-            },
-            recipient_email=user.email,
-            mascot_filename="sora_mascot_welcome.png",
-        )
-        logger.info("Verification email sent to user_id=%s", user.id)
-    except Exception as e:
-        logger.error("Failed to send verification email to %s: %s", user.email, e)
+    def _send():
+        try:
+            send_templated_email_task.delay(
+                to=recipient_email,
+                subject=subject,
+                template="accounts/email/verify_email",
+                context=context,
+                user_id=user_id,
+                mascot_filename="sora_mascot_welcome.png",
+            )
+            logger.info("Verification email sent to user_id=%s", user_id)
+        except Exception as e:
+            logger.error("Failed to send verification email to user_id=%s: %s", user_id, e)
+
+    transaction.on_commit(_send)
 
 
 def verify_email(token: str) -> None:
@@ -112,7 +118,7 @@ def resend_verification_email(email: str) -> None:
     try:
         user = User.objects.get(email=email)
         if user.is_active and not user.is_email_verified:
-            transaction.on_commit(lambda: send_verification_email(user))
+            send_verification_email(user)
     except User.DoesNotExist:
         pass
 
@@ -374,7 +380,7 @@ def send_password_reset_email(email: str) -> None:
     from django.utils.encoding import force_bytes
     from django.utils.http import urlsafe_base64_encode
 
-    from .emails import send_templated_email
+    from .tasks import send_templated_email_task
 
     email = email.strip().lower()
     try:
@@ -382,24 +388,30 @@ def send_password_reset_email(email: str) -> None:
         if user.is_active:
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
+            reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
+            subject = "Reset your password — SORA"
+            context = {
+                "first_name": user.first_name,
+                "reset_url": reset_url,
+            }
+            user_id = str(user.id)
+            recipient_email = user.email
 
             def _send_email():
-                reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
-                subject = "Reset your password — SORA"
                 try:
-                    send_templated_email(
+                    send_templated_email_task.delay(
+                        to=recipient_email,
                         subject=subject,
-                        template_prefix="accounts/email/password_reset",
-                        context={
-                            "first_name": user.first_name,
-                            "reset_url": reset_url,
-                        },
-                        recipient_email=user.email,
+                        template="accounts/email/password_reset",
+                        context=context,
+                        user_id=user_id,
                         mascot_filename="sora_mascot_security.png",
                     )
-                    logger.info("Password reset email sent to user_id=%s", user.id)
+                    logger.info("Password reset email sent to user_id=%s", user_id)
                 except Exception as e:
-                    logger.error("Failed to send password reset email to %s: %s", user.email, e)
+                    logger.error(
+                        "Failed to send password reset email to user_id=%s: %s", user_id, e
+                    )
 
             transaction.on_commit(_send_email)
     except User.DoesNotExist:

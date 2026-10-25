@@ -180,6 +180,7 @@ AUTH_COOKIE_PATH = "/api/v1/auth/"
 # Email verification (01-authentication.md §3)
 # ──────────────────────────────────────────────
 ACCOUNTS_EMAIL_VERIFICATION_MAX_AGE = 24 * 60 * 60  # 24 hours
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 
 # ──────────────────────────────────────────────
 # Google sign-in (ADR-0002, 01-authentication.md §6)

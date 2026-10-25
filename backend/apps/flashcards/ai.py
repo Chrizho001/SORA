@@ -1,14 +1,22 @@
 import json
 import logging
+import time
 
 import requests
 from django.conf import settings
 
+from apps.documents.exceptions import DocumentProcessingError
+
 logger = logging.getLogger(__name__)
 
-
-class DocumentProcessingError(Exception):
-    pass
+__all__ = [
+    "DocumentProcessingError",
+    "validate_flashcards_data",
+    "MockFlashcardGenerator",
+    "FlashcardGeneratorClient",
+    "GeminiFlashcardGeneratorClient",
+    "get_flashcard_generator",
+]
 
 
 def validate_flashcards_data(raw_data) -> list[dict]:
@@ -30,16 +38,14 @@ def validate_flashcards_data(raw_data) -> list[dict]:
                     break
 
     if not isinstance(items, list) or len(items) == 0:
-        raise DocumentProcessingError(
-            "Invalid flashcard data from AI: expected a non-empty list of flashcards."
-        )
+        logger.error("Invalid flashcard data from AI: expected non-empty list, got %r", raw_data)
+        raise DocumentProcessingError("AI service error. Please try again later.")
 
     valid_cards = []
     for item in items:
         if not isinstance(item, dict):
-            raise DocumentProcessingError(
-                "Invalid flashcard item: each item must be an object with question and answer."
-            )
+            logger.error("Invalid flashcard item: not a dict: %r", item)
+            raise DocumentProcessingError("AI service error. Please try again later.")
         question = item.get("question")
         answer = item.get("answer")
         if (
@@ -48,9 +54,8 @@ def validate_flashcards_data(raw_data) -> list[dict]:
             or not question.strip()
             or not answer.strip()
         ):
-            raise DocumentProcessingError(
-                "Invalid flashcard item: question and answer must be non-empty strings."
-            )
+            logger.error("Invalid flashcard item values: question=%r, answer=%r", question, answer)
+            raise DocumentProcessingError("AI service error. Please try again later.")
         valid_cards.append({"question": question.strip(), "answer": answer.strip()})
 
     return valid_cards
@@ -90,7 +95,7 @@ class MockFlashcardGenerator:
 
 class FlashcardGeneratorClient:
     """
-    AI interface for generating flashcards using OpenAI.
+    AI interface for generating flashcards using OpenAI / Groq.
     """
 
     def __init__(self, api_key=None, base_url=None, model_name=None):
@@ -100,17 +105,17 @@ class FlashcardGeneratorClient:
             "AI_BASE_URL",
             "https://api.groq.com/openai/v1/chat/completions",
         )
-        self.model_name = model_name or getattr(
-            settings, "AI_MODEL_NAME", "openai/gpt-oss-120b"
-        )
+        self.model_name = model_name or getattr(settings, "AI_MODEL_NAME", "openai/gpt-oss-120b")
 
     def generate(self, summary_text: str) -> list[dict]:
         if not self.api_key:
-            raise DocumentProcessingError("AI_API_KEY is not set.")
+            logger.error("AI_API_KEY is not set.")
+            raise DocumentProcessingError("AI service authentication failed.")
 
         system_prompt = (
             "You are a study assistant. Generate exactly 5 flashcards from the text. "
-            "Return a JSON object with a 'flashcards' key containing a list of objects with 'question' and 'answer' string properties."
+            "Return a JSON object with a 'flashcards' key containing a list of objects "
+            "with 'question' and 'answer' string properties."
         )
 
         try:
@@ -130,23 +135,30 @@ class FlashcardGeneratorClient:
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
         except requests.exceptions.HTTPError as exc:
+            logger.error("AI flashcard HTTP error: %s", exc, exc_info=True)
             if exc.response is not None:
-                if exc.response.status_code == 413:
-                    raise DocumentProcessingError(
-                        "Summary exceeds AI provider token limits for flashcard generation."
-                    ) from exc
+                if exc.response.status_code in (401, 403):
+                    raise DocumentProcessingError("AI service authentication failed.") from exc
                 if exc.response.status_code == 429:
                     raise DocumentProcessingError(
                         "AI rate limit reached. Please wait a moment and try again."
                     ) from exc
-            raise DocumentProcessingError(f"AI flashcard generation error: {exc}") from exc
+                if exc.response.status_code == 503:
+                    raise DocumentProcessingError(
+                        "AI service is busy. Please try again shortly."
+                    ) from exc
+            raise DocumentProcessingError("AI service error. Please try again later.") from exc
         except requests.exceptions.RequestException as exc:
-            raise DocumentProcessingError(f"Network error contacting AI service: {exc}") from exc
+            logger.error("AI flashcard network error: %s", exc, exc_info=True)
+            raise DocumentProcessingError(
+                "Network error contacting AI service. Please try again later."
+            ) from exc
 
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise DocumentProcessingError("Failed to parse AI output as JSON.") from exc
+            logger.error("Failed to parse AI output as JSON: %s", exc, exc_info=True)
+            raise DocumentProcessingError("AI service error. Please try again later.") from exc
 
         return validate_flashcards_data(parsed)
 
@@ -163,19 +175,19 @@ class GeminiFlashcardGeneratorClient:
             "AI_BASE_URL",
             "https://generativelanguage.googleapis.com/v1beta/models",
         )
-        self.model_name = model_name or getattr(
-            settings, "AI_MODEL_NAME", "gemini-3.5-flash"
-        )
+        self.model_name = model_name or getattr(settings, "AI_MODEL_NAME", "gemini-3.5-flash")
 
     def generate(self, summary_text: str) -> list[dict]:
         if not self.api_key:
-            raise DocumentProcessingError("Gemini API key is not configured in settings.")
+            logger.error("Gemini API key is not configured in settings.")
+            raise DocumentProcessingError("AI service authentication failed.")
 
         endpoint = f"{self.base_url.rstrip('/')}/{self.model_name}:generateContent"
 
         prompt = (
-            "You are an expert academic tutor. Generate exactly 5 high-yield study flashcards from the text below. "
-            "Return a JSON object with a 'flashcards' key containing a list of objects with 'question' and 'answer' string properties.\n\n"
+            "You are an expert academic tutor. Generate exactly 5 high-yield study "
+            "flashcards from the text below. Return a JSON object with a 'flashcards' "
+            "key containing a list of objects with 'question' and 'answer' string properties.\n\n"
             f"{summary_text}"
         )
 
@@ -184,8 +196,6 @@ class GeminiFlashcardGeneratorClient:
             "generationConfig": {"responseMimeType": "application/json"},
         }
         headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
-
-        import time
 
         max_attempts = 4
         last_error = None
@@ -196,12 +206,20 @@ class GeminiFlashcardGeneratorClient:
                     data = response.json()
                     candidates = data.get("candidates", [])
                     if not candidates:
-                        raise DocumentProcessingError("Gemini returned an empty candidate list.")
-                    content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        logger.error("Gemini returned empty candidate list: %s", data)
+                        raise DocumentProcessingError("AI service error. Please try again later.")
+                    content = (
+                        candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    )
                     try:
                         parsed = json.loads(content)
                     except json.JSONDecodeError as exc:
-                        raise DocumentProcessingError("Failed to parse Gemini output as JSON.") from exc
+                        logger.error(
+                            "Failed to parse Gemini output as JSON: %s", exc, exc_info=True
+                        )
+                        raise DocumentProcessingError(
+                            "AI service error. Please try again later."
+                        ) from exc
                     return validate_flashcards_data(parsed)
 
                 if response.status_code in (503, 429) and attempt < max_attempts - 1:
@@ -212,40 +230,32 @@ class GeminiFlashcardGeneratorClient:
 
             except requests.exceptions.HTTPError as exc:
                 last_error = exc
+                logger.error("Gemini HTTP error: %s", exc, exc_info=True)
                 status_code = exc.response.status_code if exc.response is not None else 0
-                error_body = exc.response.text if exc.response is not None else str(exc)
-                try:
-                    err_json = exc.response.json()
-                    err_msg = err_json.get("error", {}).get("message", error_body)
-                except Exception:
-                    err_msg = error_body
-
                 if status_code in (401, 403):
-                    raise DocumentProcessingError(
-                        f"Google Gemini authentication failed: {err_msg}"
-                    ) from exc
+                    raise DocumentProcessingError("AI service authentication failed.") from exc
                 if status_code == 429:
                     raise DocumentProcessingError(
-                        "Google Gemini rate limit reached. Please wait a moment and try again."
+                        "AI rate limit reached. Please wait a moment and try again."
                     ) from exc
                 if status_code == 503:
                     raise DocumentProcessingError(
-                        "Google Gemini is currently experiencing temporary high traffic. Please try again shortly."
+                        "AI service is busy. Please try again shortly."
                     ) from exc
-                raise DocumentProcessingError(
-                    f"Google Gemini API error ({status_code}): {err_msg}"
-                ) from exc
+                raise DocumentProcessingError("AI service error. Please try again later.") from exc
 
             except requests.exceptions.RequestException as exc:
                 last_error = exc
+                logger.error("Gemini network error: %s", exc, exc_info=True)
                 if attempt < max_attempts - 1:
                     time.sleep(1.5 * (attempt + 1))
                     continue
                 raise DocumentProcessingError(
-                    f"Network error communicating with Google Gemini: {exc}"
+                    "Network error contacting AI service. Please try again later."
                 ) from exc
 
-        raise DocumentProcessingError(f"Failed to generate flashcards with Gemini: {last_error}")
+        logger.error("Failed to generate flashcards with Gemini after retries: %s", last_error)
+        raise DocumentProcessingError("AI service error. Please try again later.")
 
 
 def get_flashcard_generator():
