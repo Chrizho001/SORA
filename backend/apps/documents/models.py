@@ -33,6 +33,7 @@ class Document(models.Model):
         default=FlashcardGenerationStatus.NOT_STARTED,
     )
     flashcard_generation_started_at = models.DateTimeField(null=True, blank=True)
+    processing_started_at = models.DateTimeField(null=True, blank=True)
     error_message = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

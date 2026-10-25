@@ -70,18 +70,22 @@ def submit_quiz(
 
         score = 0
         questions = {str(q.id): q for q in session.questions.select_related("flashcard")}
+        answers_map = {
+            str(ans.get("question_id")): ans.get("selected_choice") for ans in answers_data
+        }
         questions_to_update = []
 
-        for ans in answers_data:
-            q_id = str(ans.get("question_id"))
-            choice = ans.get("selected_choice")
-            if q_id in questions:
-                q = questions[q_id]
+        for q_id, q in questions.items():
+            if q_id in answers_map:
+                choice = answers_map[q_id]
                 q.selected_choice = choice
                 q.is_correct = choice == q.correct_answer
                 if q.is_correct:
                     score += 1
-                questions_to_update.append(q)
+            else:
+                q.selected_choice = None
+                q.is_correct = False
+            questions_to_update.append(q)
 
         if questions_to_update:
             QuizQuestion.objects.bulk_update(

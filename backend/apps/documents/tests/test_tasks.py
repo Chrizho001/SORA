@@ -19,7 +19,7 @@ def use_openai_provider(settings):
     settings.AI_PROVIDER = "openai"
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 @patch("apps.notifications.notification_service.NotificationService.notify")
 class TestProcessDocumentTask:
     @patch("apps.documents.tasks.SummarizerClient.summarize")
@@ -167,3 +167,78 @@ class TestProcessDocumentTask:
         assert len(document.extracted_text) <= 50
         # Page 3 should not have been extracted because page 1 + page 2 already exceeded 50 chars
         page3.extract_text.assert_not_called()
+
+    @patch("apps.documents.tasks.SummarizerClient.summarize")
+    @patch("apps.documents.tasks.pypdf.PdfReader")
+    def test_running_task_twice_leaves_one_summary_and_status_done(
+        self, mock_pdf_reader, mock_summarize, mock_notify, document
+    ):
+        mock_pdf = MagicMock()
+        mock_pdf.is_encrypted = False
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Content"
+        mock_pdf.pages = [mock_page]
+        mock_pdf_reader.return_value = mock_pdf
+        mock_summarize.return_value = "Summary Content"
+
+        process_document(str(document.id))
+        document.refresh_from_db()
+        assert document.status == Document.Status.DONE
+        from apps.documents.models import Summary
+
+        assert Summary.objects.filter(document=document).count() == 1
+
+        process_document(str(document.id))
+        document.refresh_from_db()
+        assert document.status == Document.Status.DONE
+        assert Summary.objects.filter(document=document).count() == 1
+        assert document.error_message == ""
+
+    @patch("apps.documents.tasks.SummarizerClient.summarize")
+    @patch("apps.documents.tasks.pypdf.PdfReader")
+    def test_summary_already_exists_no_integrity_error_and_status_done(
+        self, mock_pdf_reader, mock_summarize, mock_notify, document
+    ):
+        mock_pdf = MagicMock()
+        mock_pdf.is_encrypted = False
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Content"
+        mock_pdf.pages = [mock_page]
+        mock_pdf_reader.return_value = mock_pdf
+        mock_summarize.return_value = "New Summary"
+
+        from apps.documents.models import Summary
+
+        Summary.objects.create(
+            document=document,
+            content="Pre-existing summary",
+            ai_model_used="test-model",
+        )
+
+        process_document(str(document.id))
+        document.refresh_from_db()
+        assert document.status == Document.Status.DONE
+        assert Summary.objects.filter(document=document).count() == 1
+
+    @patch("apps.documents.tasks.SummarizerClient.summarize")
+    @patch("apps.documents.tasks.pypdf.PdfReader")
+    def test_document_deleted_mid_run_no_exception_escapes(
+        self, mock_pdf_reader, mock_summarize, mock_notify, document
+    ):
+        mock_pdf = MagicMock()
+        mock_pdf.is_encrypted = False
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Content"
+        mock_pdf.pages = [mock_page]
+        mock_pdf_reader.return_value = mock_pdf
+
+        doc_id = str(document.id)
+
+        def delete_document_mid_run(*args, **kwargs):
+            Document.objects.filter(id=doc_id).delete()
+            return "Summary"
+
+        mock_summarize.side_effect = delete_document_mid_run
+
+        process_document(doc_id)
+        assert not Document.objects.filter(id=doc_id).exists()

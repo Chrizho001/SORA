@@ -23,7 +23,7 @@ class QuizSessionViewSet(
     def submit(self, request, pk=None):
         session = self.get_object()
 
-        serializer = SubmitQuizSerializer(data=request.data)
+        serializer = SubmitQuizSerializer(data=request.data, context={"session": session})
         serializer.is_valid(raise_exception=True)
         answers_data = serializer.validated_data.get("answers", [])
 

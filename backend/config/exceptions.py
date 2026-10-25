@@ -13,7 +13,6 @@ Architecture ref: CLAUDE.md, architecture/00-overview.md, 01-authentication.md Â
 
 import logging
 
-from rest_framework.exceptions import APIException
 from rest_framework.views import exception_handler
 
 logger = logging.getLogger(__name__)
@@ -63,11 +62,52 @@ def _get_code(exc, response):
         # For DRF ValidationError, get_codes() returns a dict of field â†’ [codes].
         # We want the top-level code to be 'validation_error'.
         from rest_framework.exceptions import ValidationError
+
         if isinstance(exc, ValidationError):
+            if (
+                isinstance(codes, list)
+                and codes
+                and codes[0] not in ("invalid", "required", "blank", "null")
+            ):
+                return str(codes[0])
+            if isinstance(codes, str) and codes not in ("invalid", "required", "blank", "null"):
+                return str(codes)
+            if isinstance(codes, dict):
+                for key in ("non_field_errors", "detail"):
+                    if key in codes:
+                        c = codes[key]
+                        if (
+                            isinstance(c, list)
+                            and c
+                            and c[0] not in ("invalid", "required", "blank", "null")
+                        ):
+                            return str(c[0])
+                        if isinstance(c, str) and c not in (
+                            "invalid",
+                            "required",
+                            "blank",
+                            "null",
+                        ):
+                            return str(c)
+                all_custom = []
+                for field, c_list in codes.items():
+                    if isinstance(c_list, list):
+                        for c in c_list:
+                            if c not in ("invalid", "required", "blank", "null"):
+                                all_custom.append(str(c))
+                    elif isinstance(c_list, str) and c_list not in (
+                        "invalid",
+                        "required",
+                        "blank",
+                        "null",
+                    ):
+                        all_custom.append(str(c_list))
+                if len(all_custom) == 1:
+                    return all_custom[0]
             return "validation_error"
-            
+
         if isinstance(codes, dict):
-            # For non-validation errors with dict details (like SimpleJWT), 
+            # For non-validation errors with dict details (like SimpleJWT),
             # the literal code we want is often the string value in exc.detail["code"].
             if hasattr(exc, "detail") and isinstance(exc.detail, dict) and "code" in exc.detail:
                 return str(exc.detail["code"])
@@ -94,14 +134,24 @@ def _get_detail(exc, response):
     """Extract a human-readable detail message."""
     if hasattr(exc, "detail"):
         from rest_framework.exceptions import ValidationError
+
         detail = exc.detail
-        
+
         if isinstance(exc, ValidationError):
+            if isinstance(detail, list) and detail:
+                return str(detail[0])
+            if isinstance(detail, dict) and "non_field_errors" in detail:
+                nfe = detail["non_field_errors"]
+                if isinstance(nfe, list) and nfe:
+                    return str(nfe[0])
+                return str(nfe)
+            if isinstance(detail, dict) and "detail" in detail:
+                return str(detail["detail"])
             return "Validation error."
-            
+
         if isinstance(detail, dict) and "detail" in detail:
             return str(detail["detail"])
-            
+
         return str(detail)
     return response.reason_phrase or "An error occurred."
 
@@ -141,10 +191,7 @@ def _log_exception(exc, response, view_name, code, detail):
     """
     status = response.status_code
 
-    log_msg = (
-        f"API error: status={status} code={code} view={view_name} "
-        f"detail={detail!r}"
-    )
+    log_msg = f"API error: status={status} code={code} view={view_name} detail={detail!r}"
 
     if status >= 500:
         logger.error(log_msg, exc_info=True)

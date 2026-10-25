@@ -172,7 +172,7 @@ This file is the **single source of truth for open work**. It supersedes
 
 ## 2. Backend — Correctness
 
-- [ ] **BUG-01 · P0 · Duplicate answers inflate the quiz score (verified: 50/4)**
+- [x] **BUG-01 · P0 · Duplicate answers inflate the quiz score (verified: 50/4)**
   - **Where:** `backend/apps/quizzes/services.py` `submit_quiz()`; `backend/apps/quizzes/serializers.py`
     `SubmitQuizSerializer`.
   - **Problem:**
@@ -197,7 +197,7 @@ This file is the **single source of truth for open work**. It supersedes
     and replace `pass` with `logger.exception`.
   - **Prompt:** P-03
 
-- [ ] **BUG-03 · P0 · Document processing is not idempotent; a duplicate task marks a finished document FAILED**
+- [x] **BUG-03 · P0 · Document processing is not idempotent; a duplicate task marks a finished document FAILED**
   - **Where:** `backend/apps/documents/tasks.py` `process_document()`. Celery uses `CELERY_TASK_ACKS_LATE=True`,
     so redelivery happens.
   - **Problem:** on a second delivery, `Summary.objects.create()` hits the OneToOne constraint. The generic
@@ -210,7 +210,7 @@ This file is the **single source of truth for open work**. It supersedes
   - **Recommended fix:** as above, plus a `processing_started_at` field (migration) that BUG-05 uses.
   - **Prompt:** P-02
 
-- [ ] **BUG-04 · P0 · Upload queues the Celery task before the transaction commits, and has no broker-failure handling**
+- [x] **BUG-04 · P0 · Upload queues the Celery task before the transaction commits, and has no broker-failure handling**
   - **Where:** `backend/apps/documents/views.py` `create()`.
   - **Problem:** the worker can start before the row is committed. If Redis is down, the user gets a 500
     and is left with a document stuck in `UPLOADED`.
@@ -218,7 +218,7 @@ This file is the **single source of truth for open work**. It supersedes
     If enqueueing fails, set `FAILED` with `"Failed to queue document processing."` and log it.
   - **Prompt:** P-02
 
-- [ ] **BUG-05 · P0 · Retry is racy, can re-run finished documents, and bypasses the AI budget**
+- [x] **BUG-05 · P0 · Retry is racy, can re-run finished documents, and bypasses the AI budget**
   - **Where:** `backend/apps/documents/views.py` `retry()`.
   - **Problem:**
     - The check-then-set is not atomic, so two clicks queue two jobs.
@@ -273,7 +273,7 @@ This file is the **single source of truth for open work**. It supersedes
     `on_commit`. Tests run eagerly and assert through `mail.outbox`.
   - **Prompt:** P-03
 
-- [ ] **BUG-11 · P2 · Documents accept PUT and PATCH, which do nothing but return 200**
+- [x] **BUG-11 · P2 · Documents accept PUT and PATCH, which do nothing but return 200**
   - **Where:** `backend/apps/documents/views.py` (`ModelViewSet`).
   - **Acceptable solution:** set `http_method_names = ["get", "post", "delete", "head", "options"]`.
     Test that PATCH returns 405.
@@ -301,7 +301,7 @@ This file is the **single source of truth for open work**. It supersedes
     `{"detail": "Internal server error.", "code": "server_error"}` for unhandled exceptions when `DEBUG=False`.
   - **Prompt:** P-08
 
-- [ ] **BUG-14 · P2 · The document task crashes if the document is deleted while processing**
+- [x] **BUG-14 · P2 · The document task crashes if the document is deleted while processing**
   - **Where:** `backend/apps/documents/tasks.py` (the failure handlers call `save(update_fields=…)` on a
     deleted row).
   - **Acceptable solution:** covered by BUG-03 (re-fetch the row; return on `DoesNotExist`).
