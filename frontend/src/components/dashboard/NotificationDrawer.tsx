@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   X,
   Bell,
@@ -155,10 +156,16 @@ export function NotificationDrawer({
 
         {/* Footer */}
         <div className="pt-3 border-t border-line text-xs font-body text-muted flex items-center justify-between">
-          <span>Real-time SORA updates</span>
-          <span className="text-ink font-display font-semibold flex items-center gap-1">
+          <Link
+            href="/dashboard/notifications"
+            onClick={onClose}
+            className="text-xs font-display font-semibold text-ink hover:underline flex items-center gap-1"
+          >
+            <span>View all notifications</span>
+          </Link>
+          <span className="text-muted font-display text-[0.6875rem] flex items-center gap-1">
             <Sparkles className="size-3 text-amber-500" />
-            <span>Celery & WebPush</span>
+            <span>Real-time</span>
           </span>
         </div>
       </div>

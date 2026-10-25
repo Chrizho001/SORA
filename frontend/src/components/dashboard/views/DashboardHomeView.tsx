@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Search,
   Sparkles,
@@ -19,7 +20,6 @@ import { ActiveStudyMaterials } from "../ActiveStudyMaterials";
 import { AssignmentsBoard } from "../AssignmentsBoard";
 import { DocumentItem, TaskItem, QuizSession, FlashcardItem } from "@/lib/dashboard-api";
 import { User } from "@/lib/auth-api";
-import { DashboardTab } from "../Sidebar";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 interface DashboardHomeViewProps {
@@ -38,7 +38,6 @@ interface DashboardHomeViewProps {
   onGenerateFlashcards: (docId: string) => void;
   onStartQuiz: (docId: string) => void;
   onViewDocument: (doc: DocumentItem) => void;
-  onNavigateTab: (tab: DashboardTab) => void;
   onRetryDocument?: (docId: string) => void;
 }
 
@@ -58,7 +57,6 @@ export function DashboardHomeView({
   onGenerateFlashcards,
   onStartQuiz,
   onViewDocument,
-  onNavigateTab,
   onRetryDocument,
 }: DashboardHomeViewProps) {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
@@ -187,14 +185,13 @@ export function DashboardHomeView({
             <div className="size-11 rounded-2xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-300">
               <BookOpen className="size-5.5" />
             </div>
-            <button
-              type="button"
-              onClick={() => onNavigateTab("documents")}
+            <Link
+              href="/dashboard/documents"
               className="text-subtle group-hover:text-ink text-xs font-display flex items-center gap-1 transition-colors"
             >
               <span>View All</span>
               <ArrowRight className="size-3 group-hover:translate-x-1 transition-transform" />
-            </button>
+            </Link>
           </div>
 
           <div className="mt-4 space-y-1">
@@ -217,14 +214,13 @@ export function DashboardHomeView({
             <div className="size-11 rounded-2xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-300">
               <Brain className="size-5.5" />
             </div>
-            <button
-              type="button"
-              onClick={() => onNavigateTab("flashcards")}
+            <Link
+              href="/dashboard/flashcards"
               className="text-subtle group-hover:text-ink text-xs font-display flex items-center gap-1 transition-colors"
             >
               <span>Review</span>
               <ArrowRight className="size-3 group-hover:translate-x-1 transition-transform" />
-            </button>
+            </Link>
           </div>
 
           <div className="mt-4 space-y-1">
@@ -245,14 +241,13 @@ export function DashboardHomeView({
             <div className="size-11 rounded-2xl bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-300">
               <Zap className="size-5.5" />
             </div>
-            <button
-              type="button"
-              onClick={() => onNavigateTab("quizzes")}
+            <Link
+              href="/dashboard/quizzes"
               className="text-subtle group-hover:text-ink text-xs font-display flex items-center gap-1 transition-colors"
             >
               <span>Quizzes</span>
               <ArrowRight className="size-3 group-hover:translate-x-1 transition-transform" />
-            </button>
+            </Link>
           </div>
 
           <div className="mt-4 space-y-1">

@@ -145,9 +145,15 @@ function LoginForm() {
           "Signed In Successfully"
         );
 
-        // Redirect to dashboard
+        // Redirect to target or dashboard
+        const rawNext = searchParams?.get("next");
+        const targetUrl =
+          rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("\\")
+            ? rawNext
+            : "/dashboard";
+
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push(targetUrl);
         }, 800);
       } catch (err: unknown) {
         setLastSubmissionFailed(true);
@@ -191,6 +197,8 @@ function LoginForm() {
     );
   };
 
+  const rawNext = searchParams?.get("next");
+
   return (
     <AuthCardLayout
       title="Welcome back"
@@ -200,7 +208,7 @@ function LoginForm() {
       footerLink={{
         prompt: "Don't have an account?",
         label: "Sign up for free",
-        href: "/signup",
+        href: rawNext ? `/signup?next=${encodeURIComponent(rawNext)}` : "/signup",
       }}
       secondaryLink={{
         label: "Need help?",

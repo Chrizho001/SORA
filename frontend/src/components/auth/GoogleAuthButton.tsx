@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { authApi, AuthApiError } from "@/lib/auth-api";
 import { useAuth } from "@/lib/auth-context";
@@ -47,6 +47,13 @@ export function GoogleAuthButton({
   className = "",
 }: GoogleAuthButtonProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawNext = searchParams?.get("next");
+  const targetUrl =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("\\")
+      ? rawNext
+      : "/dashboard";
+
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const hiddenButtonRef = useRef<HTMLDivElement>(null);
@@ -65,7 +72,7 @@ export function GoogleAuthButton({
           "Google Authentication"
         );
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push(targetUrl);
         }, 700);
       } catch (err: unknown) {
         if (err instanceof AuthApiError) {
@@ -83,7 +90,7 @@ export function GoogleAuthButton({
         setIsLoading(false);
       }
     },
-    [login, router]
+    [login, router, targetUrl]
   );
 
   // Initialize Google Identity Services Script

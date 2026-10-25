@@ -1,17 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Zap,
   Play,
-  CheckCircle2,
-  XCircle,
   Trophy,
   BookOpen,
   AlertCircle,
 } from "lucide-react";
 import { DocumentItem, QuizSession } from "@/lib/dashboard-api";
 import { formatApiErrorMessage } from "@/lib/axios-client";
+import { notify } from "@/components/auth/ToastProvider";
 import { MascotGuide } from "../MascotGuide";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -22,11 +23,7 @@ interface QuizzesViewProps {
   isError?: boolean;
   onRetry?: () => void;
   onStartQuiz: (docId: string) => Promise<QuizSession>;
-  onSubmitQuiz: (
-    sessionId: string,
-    answers: { question_id: string; selected_choice: string }[]
-  ) => Promise<QuizSession>;
-  onNavigateDocuments: () => void;
+  onNavigateDocuments?: () => void;
 }
 
 export function QuizzesView({
@@ -36,12 +33,9 @@ export function QuizzesView({
   isError,
   onRetry,
   onStartQuiz,
-  onSubmitQuiz,
   onNavigateDocuments,
 }: QuizzesViewProps) {
-  const [activeSession, setActiveSession] = useState<QuizSession | null>(null);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,38 +100,13 @@ export function QuizzesView({
     setError(null);
     try {
       const session = await onStartQuiz(docId);
-      setActiveSession(session);
-      setSelectedAnswers({});
+      router.push(`/dashboard/quizzes/${session.id}`);
     } catch (err: unknown) {
-      setError(formatApiErrorMessage(err));
+      const msg = formatApiErrorMessage(err);
+      setError(msg);
+      notify.error(msg, "Unable to Start Quiz");
     } finally {
       setIsStarting(false);
-    }
-  };
-
-  const handleSelectChoice = (questionId: string, choice: string) => {
-    if (activeSession?.finished_at) return; // Locked once finished
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [questionId]: choice,
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!activeSession) return;
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const answersPayload = Object.entries(selectedAnswers).map(([qid, choice]) => ({
-        question_id: qid,
-        selected_choice: choice,
-      }));
-      const updatedSession = await onSubmitQuiz(activeSession.id, answersPayload);
-      setActiveSession(updatedSession);
-    } catch (err: unknown) {
-      setError(formatApiErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -183,133 +152,29 @@ export function QuizzesView({
         </div>
       )}
 
-      {/* Active Quiz Runner if a quiz is in progress */}
-      {activeSession ? (
-        <div className="max-w-2xl mx-auto rounded-3xl bg-surface border border-line p-6 sm:p-8 shadow-soft space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-line">
-            <div className="flex items-center gap-2.5">
-              <div className="size-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                <Zap className="size-4.5" />
-              </div>
-              <div>
-                <h3 className="font-display font-bold text-base text-ink">
-                  {activeSession.finished_at ? "Quiz Complete!" : "Speed Quiz in Progress"}
-                </h3>
-                <p className="text-xs text-muted font-body">
-                  {activeSession.questions.length} questions • Answer all to submit
-                </p>
-              </div>
-            </div>
-
-            {activeSession.finished_at && (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-display font-bold">
-                <Trophy className="size-3.5 text-emerald-600" />
-                <span>
-                  Score: {activeSession.score} / {activeSession.total_questions}
-                </span>
-              </div>
-            )}
+      {/* Launch & History View */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Start New Quiz Column (7 cols) */}
+        <div className="lg:col-span-7 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-4">
+          <div className="flex items-center gap-2">
+            <Zap className="size-5 text-amber-500" />
+            <h3 className="font-display font-bold text-base text-ink">
+              Start Quiz from Lecture Document
+            </h3>
           </div>
 
-          {/* Question Cards */}
-          <div className="space-y-6">
-            {activeSession.questions.map((q, idx) => {
-              const selected = selectedAnswers[q.id];
-              const isFinished = !!activeSession.finished_at;
+          <p className="text-xs text-muted font-body">
+            Select any analyzed document with generated flashcards to begin a 5-question speed quiz.
+          </p>
 
-              return (
-                <div key={q.id} className="p-4 rounded-2xl bg-canvas/40 border border-line space-y-3">
-                  <p className="font-display font-bold text-sm text-ink">
-                    <span className="text-muted mr-1.5">{idx + 1}.</span> {q.question_text}
-                  </p>
-
-                  <div className="space-y-2">
-                    {q.choices.map((choice, cIdx) => {
-                      const isChoiceSelected = selected === choice;
-                      const isCorrect = isFinished && choice === q.correct_answer;
-                      const isWrong = isFinished && isChoiceSelected && !q.is_correct;
-
-                      return (
-                        <button
-                          key={cIdx}
-                          type="button"
-                          onClick={() => handleSelectChoice(q.id, choice)}
-                          disabled={isFinished}
-                          className={`w-full text-left p-3 rounded-xl border text-xs font-body transition-all duration-150 active:scale-[0.99] flex items-center justify-between ${
-                            isCorrect
-                              ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold shadow-xs"
-                              : isWrong
-                              ? "bg-rose-50 border-rose-400 text-rose-900 shadow-xs"
-                              : isChoiceSelected
-                              ? "bg-night text-[#c8f560] border-night font-semibold shadow-sm scale-[1.01]"
-                              : "bg-surface hover:bg-mist hover:border-line-strong text-ink"
-                          }`}
-                        >
-                          <span>{choice}</span>
-                          {isCorrect && <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />}
-                          {isWrong && <XCircle className="size-4 text-rose-600 shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Submit Action */}
-          <div className="pt-4 border-t border-line flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setActiveSession(null)}
-              className="text-xs font-display text-muted hover:text-ink"
-            >
-              ← Back to Quiz List
-            </button>
-
-            {!activeSession.finished_at ? (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting || Object.keys(selectedAnswers).length === 0}
-                className="px-6 py-2.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-md transition-transform active:scale-95 disabled:opacity-40"
-              >
-                {isSubmitting ? "Grading..." : "Submit Answers"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setActiveSession(null)}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-display font-bold shadow-md transition-transform active:scale-95"
-              >
-                Done
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        /* Launch & History View */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Start New Quiz Column (7 cols) */}
-          <div className="lg:col-span-7 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-4">
-            <div className="flex items-center gap-2">
-              <Zap className="size-5 text-amber-500" />
-              <h3 className="font-display font-bold text-base text-ink">
-                Start Quiz from Lecture Document
-              </h3>
-            </div>
-
-            <p className="text-xs text-muted font-body">
-              Select any analyzed document with generated flashcards to begin a 5-question speed quiz.
-            </p>
-
-            {safeDocuments.filter((d) => d.status === "DONE").length === 0 ? (
-              <div className="py-8 text-center space-y-2">
-                <BookOpen className="size-8 text-subtle mx-auto" />
-                <p className="text-xs font-display font-medium text-ink">No ready documents found</p>
-                <p className="text-[0.6875rem] text-muted max-w-xs mx-auto">
-                  Upload a PDF document first so SORA can extract multiple-choice questions.
-                </p>
+          {safeDocuments.filter((d) => d.status === "DONE").length === 0 ? (
+            <div className="py-8 text-center space-y-2">
+              <BookOpen className="size-8 text-subtle mx-auto" />
+              <p className="text-xs font-display font-medium text-ink">No ready documents found</p>
+              <p className="text-[0.6875rem] text-muted max-w-xs mx-auto">
+                Upload a PDF document first so SORA can extract multiple-choice questions.
+              </p>
+              {onNavigateDocuments ? (
                 <button
                   type="button"
                   onClick={onNavigateDocuments}
@@ -317,77 +182,85 @@ export function QuizzesView({
                 >
                   Go to Documents
                 </button>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {safeDocuments
-                  .filter((d) => d.status === "DONE")
-                  .map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3.5 rounded-2xl bg-canvas/40 border border-line"
-                    >
-                      <div className="min-w-0 flex-1 pr-3">
-                        <p className="font-display font-bold text-xs sm:text-sm text-ink truncate">
-                          {doc.original_name}
-                        </p>
-                        <p className="text-[0.6875rem] text-muted mt-0.5">
-                          {doc.page_count ? `${doc.page_count} pages` : "Lecture Document"}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleStartNewQuiz(doc.id)}
-                        disabled={isStarting}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-xs transition-transform active:scale-95 disabled:opacity-50"
-                      >
-                        <Play className="size-3 fill-current" />
-                        <span>Start</span>
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-
-          {/* Past Quiz Sessions Column (5 cols) */}
-          <div className="lg:col-span-5 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-4">
-            <div className="flex items-center gap-2">
-              <Trophy className="size-5 text-emerald-600" />
-              <h3 className="font-display font-bold text-base text-ink">Recent Quiz Scores</h3>
+              ) : (
+                <Link
+                  href="/dashboard/documents"
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-night text-[#c8f560] text-xs font-display font-semibold"
+                >
+                  Go to Documents
+                </Link>
+              )}
             </div>
-
-            {safeQuizSessions.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted font-body">
-                No past quiz sessions yet. Start your first drill above!
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {safeQuizSessions.slice(0, 5).map((session) => (
+          ) : (
+            <div className="space-y-2.5">
+              {safeDocuments
+                .filter((d) => d.status === "DONE")
+                .map((doc) => (
                   <div
-                    key={session.id}
-                    className="p-3 rounded-2xl bg-canvas/40 border border-line flex items-center justify-between"
+                    key={doc.id}
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-canvas/40 border border-line"
                   >
-                    <div>
-                      <p className="text-xs font-display font-bold text-ink">
-                        Quiz • {new Date(session.created_at).toLocaleDateString()}
+                    <div className="min-w-0 flex-1 pr-3">
+                      <p className="font-display font-bold text-xs sm:text-sm text-ink truncate">
+                        {doc.original_name}
                       </p>
-                      <p className="text-[0.6875rem] text-muted font-body">
-                        {session.total_questions} Questions
+                      <p className="text-[0.6875rem] text-muted mt-0.5">
+                        {doc.page_count ? `${doc.page_count} pages` : "Lecture Document"}
                       </p>
                     </div>
 
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-display font-bold">
-                      {session.score ?? 0} / {session.total_questions}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleStartNewQuiz(doc.id)}
+                      disabled={isStarting}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-xs transition-transform active:scale-95 disabled:opacity-50"
+                    >
+                      <Play className="size-3 fill-current" />
+                      <span>Start</span>
+                    </button>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Past Quiz Sessions Column (5 cols) */}
+        <div className="lg:col-span-5 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="size-5 text-emerald-600" />
+            <h3 className="font-display font-bold text-base text-ink">Recent Quiz Scores</h3>
+          </div>
+
+          {safeQuizSessions.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted font-body">
+              No past quiz sessions yet. Start your first drill above!
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {safeQuizSessions.slice(0, 5).map((session) => (
+                <Link
+                  key={session.id}
+                  href={`/dashboard/quizzes/${session.id}`}
+                  className="p-3 rounded-2xl bg-canvas/40 hover:bg-canvas/80 border border-line flex items-center justify-between transition-colors group cursor-pointer"
+                >
+                  <div>
+                    <p className="text-xs font-display font-bold text-ink group-hover:text-night">
+                      Quiz • {new Date(session.created_at).toLocaleDateString()}
+                    </p>
+                    <p className="text-[0.6875rem] text-muted font-body">
+                      {session.total_questions} Questions
+                    </p>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-display font-bold">
+                    {session.score ?? 0} / {session.total_questions}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

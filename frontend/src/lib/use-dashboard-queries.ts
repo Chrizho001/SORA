@@ -148,6 +148,15 @@ export function useQuizSessions() {
   });
 }
 
+export function useQuizSession(id: string) {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  return useQuery({
+    queryKey: qk(user?.id, "quiz-session", id),
+    queryFn: () => quizzesApi.getQuizSession(id),
+    enabled: !!user && !isAuthLoading && !!id,
+  });
+}
+
 export function useStartQuiz() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -177,6 +186,7 @@ export function useSubmitQuiz() {
     }) => quizzesApi.submitQuiz(sessionId, answers),
     onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "quiz-sessions") });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "quiz-session", session.id) });
       notify.success(
         `Quiz completed! You scored ${session.score ?? 0}/${session.total_questions}.`,
         "Quiz Submitted"

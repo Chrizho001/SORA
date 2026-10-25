@@ -477,7 +477,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `DONE`/`FAILED`, invalidate `["flashcards"]`, `["decks"]` and `["notifications"]`.
   - **Prompt:** P-12
 
-- [ ] **FE-08 · P0 · Starting a quiz outside the Quizzes tab loses the session; rejections are unhandled**
+- [x] **FE-08 · P0 · Starting a quiz outside the Quizzes tab loses the session; rejections are unhandled**
   - **Where:** `frontend/src/app/dashboard/page.tsx` (start-quiz handlers), `QuizzesView.tsx` (local
     `activeSession` state), `DocumentsView.tsx` and `ActiveStudyMaterials.tsx` (callers that don't
     `await` or `catch`).
@@ -485,7 +485,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     loads the session by id, and every `mutateAsync` caller has a `try/catch` that shows a toast.
   - **Prompt:** P-11
 
-- [ ] **FE-09 · P0 · Dashboard navigation is local state: no deep links, Back exits the app, and mobile can't reach Quizzes or Notifications**
+- [x] **FE-09 · P0 · Dashboard navigation is local state: no deep links, Back exits the app, and mobile can't reach Quizzes or Notifications**
   - **Where:** `frontend/src/app/dashboard/page.tsx` (tab state), `MobileNav.tsx`.
   - **Acceptable solution:**
     - Real routes: `/dashboard`, `/dashboard/tasks`, `/dashboard/documents`, `/dashboard/flashcards`,

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AuthCardLayout } from "@/components/auth/AuthCardLayout";
 import { AuthInput } from "@/components/auth/AuthInput";
 import { AuthButton } from "@/components/auth/AuthButton";
@@ -12,7 +13,9 @@ import { registerSchema, RegisterFormData } from "@/lib/auth-schemas";
 import { authApi, AuthApiError } from "@/lib/auth-api";
 import { Check, ShieldCheck } from "lucide-react";
 
-export default function SignupPage() {
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const rawNext = searchParams?.get("next");
   const [isPending, startTransition] = useTransition();
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
@@ -204,7 +207,7 @@ export default function SignupPage() {
         footerLink={{
           prompt: "Already verified?",
           label: "Log in here",
-          href: "/login",
+          href: rawNext ? `/login?next=${encodeURIComponent(rawNext)}` : "/login",
         }}
       >
         <div className="space-y-6 text-center py-4">
@@ -224,7 +227,7 @@ export default function SignupPage() {
 
           <div className="pt-4 flex flex-col sm:flex-row gap-3">
             <Link
-              href="/login"
+              href={rawNext ? `/login?next=${encodeURIComponent(rawNext)}` : "/login"}
               className="w-full flex items-center justify-center h-[50px] px-6 rounded-full bg-night text-white font-display font-medium text-sm shadow-button hover:bg-night-3 transition-colors"
             >
               Continue to Login
@@ -250,7 +253,7 @@ export default function SignupPage() {
       footerLink={{
         prompt: "Already have an account?",
         label: "Sign in",
-        href: "/login",
+        href: rawNext ? `/login?next=${encodeURIComponent(rawNext)}` : "/login",
       }}
       secondaryLink={{
         label: "Privacy Policy",
@@ -406,5 +409,13 @@ export default function SignupPage() {
         </form>
       </div>
     </AuthCardLayout>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-dvh bg-paper" />}>
+      <SignupForm />
+    </Suspense>
   );
 }
