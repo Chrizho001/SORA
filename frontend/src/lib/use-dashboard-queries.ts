@@ -10,6 +10,7 @@ import {
   DocumentItem,
   CreateTaskPayload,
   TaskQueryParams,
+  NotificationPreference,
 } from "./dashboard-api";
 import { formatApiErrorMessage } from "./axios-client";
 import { notify } from "@/components/auth/ToastProvider";
@@ -317,6 +318,57 @@ export function useMarkAllNotificationsRead() {
     onError: (error: unknown) => {
       const msg = formatApiErrorMessage(error);
       notify.error(msg, "Notification Error");
+    },
+  });
+}
+
+export function useNotificationPreferences() {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  return useQuery({
+    queryKey: qk(user?.id, "notification-preferences"),
+    queryFn: () => notificationsApi.getNotificationPreferences(),
+    enabled: !!user && !isAuthLoading,
+  });
+}
+
+export function useUpdateNotificationPreference() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: (payload: {
+      notification_type: string;
+      in_app_enabled?: boolean;
+      push_enabled?: boolean;
+      email_enabled?: boolean;
+    }) => notificationsApi.updateNotificationPreference(payload),
+    onMutate: async (newPref) => {
+      const queryKey = qk(user?.id, "notification-preferences");
+      await queryClient.cancelQueries({ queryKey });
+      const previousPrefs = queryClient.getQueryData<NotificationPreference[]>(queryKey);
+
+      if (previousPrefs) {
+        queryClient.setQueryData<NotificationPreference[]>(
+          queryKey,
+          previousPrefs.map((pref) =>
+            pref.notification_type === newPref.notification_type
+              ? { ...pref, ...newPref }
+              : pref
+          )
+        );
+      }
+
+      return { previousPrefs };
+    },
+    onError: (_err, _newPref, context) => {
+      const queryKey = qk(user?.id, "notification-preferences");
+      if (context?.previousPrefs) {
+        queryClient.setQueryData(queryKey, context.previousPrefs);
+      }
+      notify.error("Failed to update notification preference.", "Preference Update Failed");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "notification-preferences") });
     },
   });
 }

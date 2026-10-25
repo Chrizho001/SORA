@@ -530,7 +530,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     and `to` (or `date` plus `tz`, see BUG-08).
   - **Prompt:** P-14
 
-- [ ] **FE-14 · P0 · Settings is read-only: no profile edit, password change or notification preferences**
+- [x] **FE-14 · P0 · Settings is read-only: no profile edit, password change or notification preferences**
   - **Where:** `SettingsView.tsx`.
   - **Acceptable solution:**
     - A profile form (first and last name) that calls `PATCH /auth/me/`.

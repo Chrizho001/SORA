@@ -244,4 +244,61 @@ export const notificationsApi = {
     const res = await apiClient.patch<{ updated: number }>("/notifications/read-all/");
     return res.data;
   },
+
+  async getNotificationPreferences(): Promise<NotificationPreference[]> {
+    const res = await apiClient.get<NotificationPreference[] | { results: NotificationPreference[] }>(
+      "/notification-preferences/"
+    );
+    if (Array.isArray(res.data)) return res.data;
+    if ("results" in res.data && Array.isArray(res.data.results)) return res.data.results;
+    return [];
+  },
+
+  async updateNotificationPreference(payload: {
+    notification_type: string;
+    in_app_enabled?: boolean;
+    push_enabled?: boolean;
+    email_enabled?: boolean;
+  }): Promise<NotificationPreference> {
+    const res = await apiClient.patch<NotificationPreference>(
+      "/notification-preferences/update/",
+      payload
+    );
+    return res.data;
+  },
+
+  async createPushSubscription(payload: PushSubscriptionPayload): Promise<PushSubscriptionItem> {
+    const res = await apiClient.post<PushSubscriptionItem>("/push-subscriptions/", payload);
+    return res.data;
+  },
+
+  async deletePushSubscription(id: string): Promise<void> {
+    await apiClient.delete(`/push-subscriptions/${id}/`);
+  },
 };
+
+export interface NotificationPreference {
+  notification_type: string;
+  in_app_enabled: boolean;
+  push_enabled: boolean;
+  email_enabled?: boolean;
+}
+
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  keys?: {
+    p256dh: string;
+    auth: string;
+  };
+  user_agent?: string;
+}
+
+export interface PushSubscriptionItem {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string;
+}
