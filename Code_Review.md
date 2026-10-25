@@ -427,7 +427,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     JSON), and the SW `push` and `notificationclick` handlers are ready for FE-14.
   - **Prompt:** P-10
 
-- [ ] **FE-02 · P0 · Concurrent 401s cause a refresh race that silently kills the session**
+- [x] **FE-02 · P0 · Concurrent 401s cause a refresh race that silently kills the session**
   - **Where:** `frontend/src/lib/axios-client.ts` (401 interceptor); `frontend/src/lib/auth-context.tsx`.
   - **Problem:** each 401 starts its own `/token/refresh/`. The backend rotates and blacklists refresh
     tokens, so the second refresh fails and wipes the fresh token. Every request then fails while the UI
@@ -440,13 +440,13 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - Make the mount-time refresh idempotent under React Strict Mode.
   - **Prompt:** P-09
 
-- [ ] **FE-03 · P0 · The previous user's data survives logout**
+- [x] **FE-03 · P0 · The previous user's data survives logout**
   - **Where:** `frontend/src/lib/auth-context.tsx` `logout()`.
   - **Acceptable solution:** call `queryClient.clear()` on logout and on session expiry, and include
     `user.id` in query keys.
   - **Prompt:** P-09
 
-- [ ] **FE-04 · P0 · Dashboard queries fire before auth resolves, with no loading or error states**
+- [x] **FE-04 · P0 · Dashboard queries fire before auth resolves, with no loading or error states**
   - **Where:** `frontend/src/lib/use-dashboard-queries.ts` (no `enabled: !!user`; one hook hard-codes
     `enabled: true`); `frontend/src/app/dashboard/page.tsx`; the views use `= []` defaults.
   - **Acceptable solution:** gate every query on `!!user && !isAuthLoading`. Each view renders skeleton,

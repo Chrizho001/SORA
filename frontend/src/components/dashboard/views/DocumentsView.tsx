@@ -18,9 +18,13 @@ import {
 import { DocumentItem } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
 import { FormattedSummary, stripMarkdown } from "../FormattedSummary";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface DocumentsViewProps {
-  documents: DocumentItem[];
+  documents?: DocumentItem[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onUploadClick: () => void;
   onGenerateFlashcards: (docId: string) => void;
   onStartQuiz: (docId: string) => void;
@@ -30,6 +34,9 @@ interface DocumentsViewProps {
 
 export function DocumentsView({
   documents,
+  isLoading,
+  isError,
+  onRetry,
   onUploadClick,
   onGenerateFlashcards,
   onStartQuiz,
@@ -37,6 +44,61 @@ export function DocumentsView({
   onRetryDocument,
 }: DocumentsViewProps) {
   const [selectedSummaryDoc, setSelectedSummaryDoc] = useState<DocumentItem | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-32 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-56 rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+              PDF & Lecture Documents
+            </h1>
+            <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
+              Upload syllabi, lecture slides, diagrams, or textbook chapters to generate multimodal AI summaries and flashcards.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <AlertCircle className="size-10 text-rose-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-display font-bold text-base text-ink">Failed to load documents</h3>
+            <p className="text-xs text-muted max-w-sm mx-auto font-body">
+              An error occurred while communicating with the study server.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <RotateCw className="size-3.5" />
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeDocuments = documents ?? [];
 
   return (
     <div className="space-y-6 pb-16">
@@ -69,7 +131,7 @@ export function DocumentsView({
       />
 
       {/* Document Library Grid */}
-      {documents.length === 0 ? (
+      {safeDocuments.length === 0 ? (
         <div className="rounded-3xl bg-surface border border-line p-12 text-center space-y-4 shadow-soft">
           <div className="size-16 rounded-3xl bg-canvas text-subtle mx-auto flex items-center justify-center">
             <UploadCloud className="size-8 text-muted" />
@@ -91,7 +153,7 @@ export function DocumentsView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {documents.map((doc) => {
+          {safeDocuments.map((doc) => {
             const isDone = doc.status === "DONE";
             const isProcessing = doc.status === "PROCESSING" || doc.status === "UPLOADED";
             const isFailed = doc.status === "FAILED";

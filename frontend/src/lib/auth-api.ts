@@ -11,6 +11,7 @@
 
 import {
   authClient,
+  refreshAccessToken,
   setStoredAccessToken,
 } from "./axios-client";
 
@@ -147,9 +148,8 @@ export const authApi = {
    * Authenticated via HttpOnly cookie; requires X-Requested-With
    */
   async refreshToken(): Promise<{ access: string }> {
-    const res = await authClient.post<{ access: string }>("/token/refresh/");
-    setStoredAccessToken(res.data.access);
-    return res.data;
+    const access = await refreshAccessToken();
+    return { access };
   },
 
   /**

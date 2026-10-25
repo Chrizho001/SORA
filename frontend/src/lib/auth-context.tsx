@@ -7,7 +7,10 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { User, authApi } from "./auth-api";
+import { registerSessionExpiredHandler } from "./axios-client";
 
 interface AuthContextType {
   user: User | null;
@@ -21,15 +24,36 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Module-level initialRefresh promise reused across mounts under React Strict Mode
+let initialRefresh: Promise<{ user: User | null; access: string | null }> | null = null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Access token is held in-memory ONLY as required by architecture/01-authentication.md
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  // Register session expired handler to reset state and redirect to /login?expired=1
+  useEffect(() => {
+    registerSessionExpiredHandler(() => {
+      setUser(null);
+      setAccessToken(null);
+      queryClient.clear();
+      initialRefresh = null;
+      router.replace("/login?expired=1");
+    });
+    return () => {
+      registerSessionExpiredHandler(null);
+    };
+  }, [queryClient, router]);
+
   const login = useCallback((access: string, userData: User) => {
     setAccessToken(access);
     setUser(userData);
+    initialRefresh = Promise.resolve({ user: userData, access });
   }, []);
 
   const logout = useCallback(async () => {
@@ -40,8 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setAccessToken(null);
       setUser(null);
+      queryClient.clear();
+      initialRefresh = null;
     }
-  }, []);
+  }, [queryClient]);
 
   /**
    * Refresh session silently via HttpOnly cookie
@@ -62,20 +88,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Try silent refresh on initial load
+  // Try silent refresh on initial load, idempotent under React Strict Mode
   useEffect(() => {
     let isMounted = true;
-    (async () => {
-      try {
-        await refreshSession();
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    })();
+
+    if (!initialRefresh) {
+      initialRefresh = (async () => {
+        try {
+          const { access } = await authApi.refreshToken();
+          const profile = await authApi.getMe(access);
+          return { user: profile, access };
+        } catch {
+          return { user: null, access: null };
+        }
+      })();
+    }
+
+    initialRefresh
+      .then((res) => {
+        if (isMounted) {
+          setAccessToken(res.access);
+          setUser(res.user);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
     return () => {
       isMounted = false;
     };
-  }, [refreshSession]);
+  }, []);
 
   return (
     <AuthContext.Provider

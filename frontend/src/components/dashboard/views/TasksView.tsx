@@ -5,9 +5,13 @@ import { Plus, CalendarDays, CheckCircle2, Circle, Clock, Trash2 } from "lucide-
 import { TaskItem } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
 import { MiniCalendar } from "../MiniCalendar";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface TasksViewProps {
-  tasks: TaskItem[];
+  tasks?: TaskItem[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onToggleTask: (task: TaskItem) => void;
   onDeleteTask: (id: string) => void;
   onAddTaskClick: () => void;
@@ -15,6 +19,9 @@ interface TasksViewProps {
 
 export function TasksView({
   tasks,
+  isLoading,
+  isError,
+  onRetry,
   onToggleTask,
   onDeleteTask,
   onAddTaskClick,
@@ -22,7 +29,66 @@ export function TasksView({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<number | null>(null);
 
-  const filteredTasks = tasks.filter((t) => {
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-4">
+            <Skeleton className="h-72 rounded-3xl" />
+          </div>
+          <div className="lg:col-span-8 space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-20 rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+              Schedule & Task Manager
+            </h1>
+            <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
+              Organize study blocks, assignment due dates, and exam milestones with date pickers.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <Clock className="size-10 text-rose-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-display font-bold text-base text-ink">Failed to load study tasks</h3>
+            <p className="text-xs text-muted max-w-sm mx-auto font-body">
+              An error occurred while loading your schedule.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeTasks = tasks ?? [];
+
+  const filteredTasks = safeTasks.filter((t) => {
     if (selectedDate && t.due_at) {
       if (t.due_at.split("T")[0] !== selectedDate) return false;
     }
@@ -64,7 +130,7 @@ export function TasksView({
         {/* Calendar on Left/Top (4 cols) */}
         <div className="lg:col-span-4">
           <MiniCalendar
-            tasks={tasks}
+            tasks={safeTasks}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             onAddTaskClick={onAddTaskClick}

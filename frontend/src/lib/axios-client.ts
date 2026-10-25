@@ -36,6 +36,32 @@ export const getStoredAccessToken = (): string | null => {
   return inMemoryAccessToken;
 };
 
+type SessionExpiredHandler = () => void;
+let sessionExpiredHandler: SessionExpiredHandler | null = null;
+
+export const registerSessionExpiredHandler = (fn: SessionExpiredHandler | null) => {
+  sessionExpiredHandler = fn;
+};
+
+let refreshPromise: Promise<string> | null = null;
+
+export function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+  refreshPromise = (async () => {
+    try {
+      const res = await authClient.post<{ access: string }>("/token/refresh/");
+      const newAccess = res.data.access;
+      setStoredAccessToken(newAccess);
+      return newAccess;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 /**
  * Extracts a human-friendly, informative error message from any API error.
  * Ensures no errors fail silently or leave the user guessing.
@@ -187,7 +213,19 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
+    const isRefreshOrLogin =
+      config.url?.includes("/token/refresh/") ||
+      config.url?.includes("/login/");
+
+    if (!inMemoryAccessToken && !isRefreshOrLogin) {
+      try {
+        await refreshAccessToken();
+      } catch {
+        // If refresh fails, proceed without token; response interceptor handles 401
+      }
+    }
+
     if (inMemoryAccessToken && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
     }
@@ -211,16 +249,22 @@ apiClient.interceptors.response.use(
 
     // Handle token refresh on 401 for authenticated endpoints
     const originalRequest = config as InternalAxiosRequestConfig & { _retry?: boolean };
-    if (status === 401 && !originalRequest._retry && inMemoryAccessToken) {
+    const isRefreshOrLogin =
+      originalRequest.url?.includes("/token/refresh/") ||
+      originalRequest.url?.includes("/login/");
+
+    if (status === 401 && !originalRequest._retry && !isRefreshOrLogin) {
       originalRequest._retry = true;
+      const failedToken = inMemoryAccessToken;
       try {
-        const refreshRes = await authClient.post<{ access: string }>("/token/refresh/");
-        const newAccess = refreshRes.data.access;
-        setStoredAccessToken(newAccess);
+        const newAccess = await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${newAccess}`;
         return apiClient(originalRequest);
       } catch {
-        setStoredAccessToken(null);
+        if (inMemoryAccessToken === failedToken) {
+          setStoredAccessToken(null);
+        }
+        sessionExpiredHandler?.();
         throw new AuthApiError(401, "Your session has expired. Please sign in again.", "token_expired");
       }
     }

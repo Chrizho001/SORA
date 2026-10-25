@@ -20,13 +20,17 @@ import { AssignmentsBoard } from "../AssignmentsBoard";
 import { DocumentItem, TaskItem, QuizSession, FlashcardItem } from "@/lib/dashboard-api";
 import { User } from "@/lib/auth-api";
 import { DashboardTab } from "../Sidebar";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface DashboardHomeViewProps {
   user: User;
-  documents: DocumentItem[];
-  tasks: TaskItem[];
-  flashcards: FlashcardItem[];
-  quizSessions: QuizSession[];
+  documents?: DocumentItem[];
+  tasks?: TaskItem[];
+  flashcards?: FlashcardItem[];
+  quizSessions?: QuizSession[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onUploadClick: () => void;
   onAddTaskClick: () => void;
   onToggleTask: (task: TaskItem) => void;
@@ -44,6 +48,9 @@ export function DashboardHomeView({
   tasks,
   flashcards,
   quizSessions,
+  isLoading,
+  isError,
+  onRetry,
   onUploadClick,
   onAddTaskClick,
   onToggleTask,
@@ -57,24 +64,78 @@ export function DashboardHomeView({
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6 sm:space-y-8 pb-16">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-64 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-3xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="lg:col-span-2 h-80 rounded-3xl" />
+          <Skeleton className="h-80 rounded-3xl" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 sm:space-y-8 pb-16">
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <div className="size-12 rounded-full bg-rose-50 text-rose-600 mx-auto flex items-center justify-center">
+            <Sparkles className="size-6" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-display font-bold text-ink">Failed to load study dashboard</h2>
+            <p className="text-xs sm:text-sm text-muted">
+              We couldn&apos;t load your study materials. Please check your connection and try again.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Safe defaults only after isError check
+  const safeDocuments = documents ?? [];
+  const safeTasks = tasks ?? [];
+  const safeFlashcards = flashcards ?? [];
+  const safeQuizSessions = quizSessions ?? [];
+
   // Calculate statistics
-  const totalSummarizedDocs = documents.filter((d) => d.status === "DONE").length;
-  const totalCards = flashcards.length;
+  const totalSummarizedDocs = safeDocuments.filter((d) => d.status === "DONE").length;
+  const totalCards = safeFlashcards.length;
   const averageQuizScore =
-    quizSessions.length > 0
+    safeQuizSessions.length > 0
       ? Math.round(
-          quizSessions.reduce((acc, q) => acc + (q.score ?? 0), 0) /
-            Math.max(1, quizSessions.reduce((acc, q) => acc + (q.total_questions || 1), 0)) *
+          safeQuizSessions.reduce((acc, q) => acc + (q.score ?? 0), 0) /
+            Math.max(1, safeQuizSessions.reduce((acc, q) => acc + (q.total_questions || 1), 0)) *
             100
         )
       : 85;
 
   // Filter items by search query if present
-  const displayedDocuments = documents.filter((d) =>
+  const displayedDocuments = safeDocuments.filter((d) =>
     searchQuery ? d.original_name.toLowerCase().includes(searchQuery.toLowerCase()) : true
   );
 
-  const displayedTasks = tasks.filter((t) =>
+  const displayedTasks = safeTasks.filter((t) =>
     searchQuery ? t.title.toLowerCase().includes(searchQuery.toLowerCase()) : true
   );
 
@@ -139,7 +200,7 @@ export function DashboardHomeView({
           <div className="mt-4 space-y-1">
             <div className="flex items-baseline justify-between">
               <p className="text-2xl font-display font-bold text-ink">
-                {totalSummarizedDocs || documents.length}
+                {totalSummarizedDocs || safeDocuments.length}
               </p>
               <span className="text-[0.6875rem] font-display font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                 Active
@@ -203,7 +264,7 @@ export function DashboardHomeView({
             </div>
             <h4 className="font-display font-bold text-sm text-ink">Speed Quizzes</h4>
             <p className="text-xs text-muted font-body">
-              {quizSessions.length} session{quizSessions.length === 1 ? "" : "s"} completed
+              {safeQuizSessions.length} session{safeQuizSessions.length === 1 ? "" : "s"} completed
             </p>
           </div>
         </div>
@@ -267,7 +328,7 @@ export function DashboardHomeView({
         {/* Interactive Mini Calendar (3.5 cols) */}
         <div className="lg:col-span-3">
           <MiniCalendar
-            tasks={tasks}
+            tasks={safeTasks}
             selectedDate={selectedCalendarDate}
             onSelectDate={setSelectedCalendarDate}
             onAddTaskClick={onAddTaskClick}

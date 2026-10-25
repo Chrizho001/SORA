@@ -58,12 +58,14 @@ export default function DashboardPage() {
   }, [isLoading, user, router]);
 
   // Queries
-  const { data: documents = [] } = useDocuments();
-  const { data: tasks = [] } = useTasks();
-  const { data: flashcards = [] } = useFlashcards();
-  const { data: quizSessions = [] } = useQuizSessions();
-  const { data: notifications = [] } = useNotifications();
-  const { data: unreadCount = 0 } = useUnreadNotificationCount();
+  const documentsQuery = useDocuments();
+  const tasksQuery = useTasks();
+  const flashcardsQuery = useFlashcards();
+  const quizSessionsQuery = useQuizSessions();
+  const notificationsQuery = useNotifications();
+  const unreadCountQuery = useUnreadNotificationCount();
+
+  const unreadCount = unreadCountQuery.data ?? 0;
 
   // Mutations
   const uploadDocMutation = useUploadDocument();
@@ -153,10 +155,28 @@ export default function DashboardPage() {
           {activeTab === "dashboard" && (
             <DashboardHomeView
               user={user}
-              documents={documents}
-              tasks={tasks}
-              flashcards={flashcards}
-              quizSessions={quizSessions}
+              documents={documentsQuery.data}
+              tasks={tasksQuery.data}
+              flashcards={flashcardsQuery.data}
+              quizSessions={quizSessionsQuery.data}
+              isLoading={
+                documentsQuery.isLoading ||
+                tasksQuery.isLoading ||
+                flashcardsQuery.isLoading ||
+                quizSessionsQuery.isLoading
+              }
+              isError={
+                documentsQuery.isError ||
+                tasksQuery.isError ||
+                flashcardsQuery.isError ||
+                quizSessionsQuery.isError
+              }
+              onRetry={() => {
+                documentsQuery.refetch();
+                tasksQuery.refetch();
+                flashcardsQuery.refetch();
+                quizSessionsQuery.refetch();
+              }}
               onUploadClick={() => setIsUploadModalOpen(true)}
               onAddTaskClick={() => setIsTaskModalOpen(true)}
               onToggleTask={handleToggleTask}
@@ -174,7 +194,10 @@ export default function DashboardPage() {
 
           {activeTab === "documents" && (
             <DocumentsView
-              documents={documents}
+              documents={documentsQuery.data}
+              isLoading={documentsQuery.isLoading}
+              isError={documentsQuery.isError}
+              onRetry={() => documentsQuery.refetch()}
               onUploadClick={() => setIsUploadModalOpen(true)}
               onGenerateFlashcards={(docId) => generateCardsMutation.mutate(docId)}
               onStartQuiz={async (docId) => {
@@ -188,8 +211,14 @@ export default function DashboardPage() {
 
           {activeTab === "flashcards" && (
             <FlashcardsView
-              documents={documents}
-              flashcards={flashcards}
+              documents={documentsQuery.data}
+              flashcards={flashcardsQuery.data}
+              isLoading={flashcardsQuery.isLoading || documentsQuery.isLoading}
+              isError={flashcardsQuery.isError}
+              onRetry={() => {
+                flashcardsQuery.refetch();
+                documentsQuery.refetch();
+              }}
               onGenerateFlashcards={(docId) => generateCardsMutation.mutate(docId)}
               onNavigateDocuments={() => setActiveTab("documents")}
             />
@@ -197,8 +226,14 @@ export default function DashboardPage() {
 
           {activeTab === "quizzes" && (
             <QuizzesView
-              documents={documents}
-              quizSessions={quizSessions}
+              documents={documentsQuery.data}
+              quizSessions={quizSessionsQuery.data}
+              isLoading={quizSessionsQuery.isLoading || documentsQuery.isLoading}
+              isError={quizSessionsQuery.isError}
+              onRetry={() => {
+                quizSessionsQuery.refetch();
+                documentsQuery.refetch();
+              }}
               onStartQuiz={(docId) => startQuizMutation.mutateAsync(docId)}
               onSubmitQuiz={(sessionId, answers) =>
                 submitQuizMutation.mutateAsync({ sessionId, answers })
@@ -209,7 +244,10 @@ export default function DashboardPage() {
 
           {activeTab === "tasks" && (
             <TasksView
-              tasks={tasks}
+              tasks={tasksQuery.data}
+              isLoading={tasksQuery.isLoading}
+              isError={tasksQuery.isError}
+              onRetry={() => tasksQuery.refetch()}
               onToggleTask={handleToggleTask}
               onDeleteTask={(id) => deleteTaskMutation.mutate(id)}
               onAddTaskClick={() => setIsTaskModalOpen(true)}
@@ -218,7 +256,10 @@ export default function DashboardPage() {
 
           {activeTab === "notifications" && (
             <NotificationsView
-              notifications={notifications}
+              notifications={notificationsQuery.data}
+              isLoading={notificationsQuery.isLoading}
+              isError={notificationsQuery.isError}
+              onRetry={() => notificationsQuery.refetch()}
               onMarkRead={(id) => markReadMutation.mutate(id)}
               onMarkAllRead={() => markAllReadMutation.mutate()}
               onNavigateTab={(tab) => setActiveTab(tab)}
@@ -252,7 +293,7 @@ export default function DashboardPage() {
       <NotificationDrawer
         isOpen={isNotificationDrawerOpen}
         onClose={() => setIsNotificationDrawerOpen(false)}
-        notifications={notifications}
+        notifications={notificationsQuery.data ?? []}
         onMarkRead={(id) => markReadMutation.mutate(id)}
         onMarkAllRead={() => markAllReadMutation.mutate()}
       />

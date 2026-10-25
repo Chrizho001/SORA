@@ -13,9 +13,13 @@ import {
 } from "lucide-react";
 import { NotificationItem } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface NotificationsViewProps {
-  notifications: NotificationItem[];
+  notifications?: NotificationItem[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
   onNavigateTab?: (tab: "documents" | "flashcards" | "quizzes" | "tasks") => void;
@@ -59,13 +63,69 @@ const NOTIFICATION_CONFIG: Record<
 
 export function NotificationsView({
   notifications,
+  isLoading,
+  isError,
+  onRetry,
   onMarkRead,
   onMarkAllRead,
 }: NotificationsViewProps) {
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
-  const filteredNotifications = notifications.filter((n) =>
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-full" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+              Study Alerts & Activity Logs
+            </h1>
+            <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
+              Live updates when your AI summaries finish, cards are created, or assignment deadlines approach.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <Bell className="size-10 text-rose-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-display font-bold text-base text-ink">Failed to load notifications</h3>
+            <p className="text-xs text-muted max-w-sm mx-auto font-body">
+              An error occurred while fetching your alerts.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeNotifications = notifications ?? [];
+  const unreadCount = safeNotifications.filter((n) => !n.read_at).length;
+  const filteredNotifications = safeNotifications.filter((n) =>
     filter === "unread" ? !n.read_at : true
   );
 
@@ -122,7 +182,7 @@ export function NotificationsView({
                   : "bg-canvas text-muted hover:text-ink hover:bg-mist"
               }`}
             >
-              All Alerts ({notifications.length})
+              All Alerts ({safeNotifications.length})
             </button>
             <button
               type="button"

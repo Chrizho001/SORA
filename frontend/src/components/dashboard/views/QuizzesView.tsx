@@ -13,10 +13,14 @@ import {
 import { DocumentItem, QuizSession } from "@/lib/dashboard-api";
 import { formatApiErrorMessage } from "@/lib/axios-client";
 import { MascotGuide } from "../MascotGuide";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface QuizzesViewProps {
-  documents: DocumentItem[];
-  quizSessions: QuizSession[];
+  documents?: DocumentItem[];
+  quizSessions?: QuizSession[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onStartQuiz: (docId: string) => Promise<QuizSession>;
   onSubmitQuiz: (
     sessionId: string,
@@ -28,6 +32,9 @@ interface QuizzesViewProps {
 export function QuizzesView({
   documents,
   quizSessions,
+  isLoading,
+  isError,
+  onRetry,
   onStartQuiz,
   onSubmitQuiz,
   onNavigateDocuments,
@@ -37,6 +44,62 @@ export function QuizzesView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+              Speed Quizzes & Exam Simulation
+            </h1>
+            <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
+              Timed multiple-choice drills to benchmark your exam readiness and retain key concepts.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <AlertCircle className="size-10 text-rose-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-display font-bold text-base text-ink">Failed to load quiz sessions</h3>
+            <p className="text-xs text-muted max-w-sm mx-auto font-body">
+              An error occurred while loading your past quiz performance.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <Zap className="size-3.5" />
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeDocuments = documents ?? [];
+  const safeQuizSessions = quizSessions ?? [];
 
   const handleStartNewQuiz = async (docId: string) => {
     setIsStarting(true);
@@ -97,7 +160,7 @@ export function QuizzesView({
         section="quizzes"
         actionLabel="Start New Quiz"
         onActionClick={() => {
-          const readyDoc = documents.find((d) => d.status === "DONE");
+          const readyDoc = safeDocuments.find((d) => d.status === "DONE");
           if (readyDoc) handleStartNewQuiz(readyDoc.id);
         }}
       />
@@ -240,7 +303,7 @@ export function QuizzesView({
               Select any analyzed document with generated flashcards to begin a 5-question speed quiz.
             </p>
 
-            {documents.filter((d) => d.status === "DONE").length === 0 ? (
+            {safeDocuments.filter((d) => d.status === "DONE").length === 0 ? (
               <div className="py-8 text-center space-y-2">
                 <BookOpen className="size-8 text-subtle mx-auto" />
                 <p className="text-xs font-display font-medium text-ink">No ready documents found</p>
@@ -257,7 +320,7 @@ export function QuizzesView({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {documents
+                {safeDocuments
                   .filter((d) => d.status === "DONE")
                   .map((doc) => (
                     <div
@@ -295,13 +358,13 @@ export function QuizzesView({
               <h3 className="font-display font-bold text-base text-ink">Recent Quiz Scores</h3>
             </div>
 
-            {quizSessions.length === 0 ? (
+            {safeQuizSessions.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted font-body">
                 No past quiz sessions yet. Start your first drill above!
               </div>
             ) : (
               <div className="space-y-2.5">
-                {quizSessions.slice(0, 5).map((session) => (
+                {safeQuizSessions.slice(0, 5).map((session) => (
                   <div
                     key={session.id}
                     className="p-3 rounded-2xl bg-canvas/40 border border-line flex items-center justify-between"
