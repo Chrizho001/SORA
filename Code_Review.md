@@ -611,7 +611,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     5. Check the manifest is reachable and the service worker registers.
   - **Prompt:** P-19
 
-- [ ] **FE-23 · P1 · API base URLs are absolute, so the refresh cookie breaks on cross-site deploys**
+- [x] **FE-23 · P1 · API base URLs are absolute, so the refresh cookie breaks on cross-site deploys**
   - **Where:** `frontend/.env.example` (`http://localhost:8000/...`), `axios-client.ts`.
   - **Problem:** the refresh cookie is `SameSite=Lax` and scoped to `/api/v1/auth/`. If the frontend and
     API are on different *sites* in production, the cookie is never sent and silent refresh fails.
@@ -619,6 +619,9 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     (`/api/v1/:path*` → `BACKEND_INTERNAL_URL`), with relative base URLs (`/api/v1`) and Django
     `NUM_PROXIES` set accordingly (SEC-03).
   - **Prompt:** P-18
+  - **Note (2026-10-26):** done. Vercel rewrites `/api/v1/*` to Render; relative base URLs. Live check:
+    refresh cookie `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth/` on the Vercel origin, survives
+    reload, refused after logout.
 
 - [x] **FE-24 · P2 · Duplicate icon sources**
   - **Where:** `src/app/{favicon.ico,icon.svg,apple-icon.png}` and `public/*`, plus explicit `metadata.icons`.
@@ -640,14 +643,21 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     email and Gemini keys. Run `python manage.py migrate` and `collectstatic` in the release step.
     Document it in `docs/deployment.md`.
   - **Prompt:** P-18
+  - **Note (2026-10-26):** live at https://sora-study-nine.vercel.app (Vercel) + Render free API,
+    Postgres, Key Value; Brevo email. Server-side smoke test passed (sign-up email, verify, login,
+    reload, tasks, Gemini PDF summary in 11 s, AI cards appended, quiz graded, logout). `NUM_PROXIES=3`
+    measured (`docs/deployment.md` §4). **Remaining:** install on a phone and airplane-mode check.
 
-- [ ] **DEP-02 · P0 (guard rail) · Never expose `config.settings.dev` publicly**
+- [x] **DEP-02 · P0 (guard rail) · Never expose `config.settings.dev` publicly**
   - **Problem:** the abandoned ngrok setup served `DEBUG=True`, `ALLOWED_HOSTS=["*"]`, CORS open to all
     origins with credentials, and auto-verified emails.
   - **Acceptable solution:** if a tunnel is needed for phone testing before deployment, use a
     `config/settings/demo.py` that imports `prod` and only relaxes HTTPS redirect and email
     (`console`). It never auto-verifies accounts.
   - **Prompt:** P-18
+  - **Note (2026-10-26):** done. `config/settings/demo.py` = prod + `DEMO_SSL_REDIRECT` /
+    `DEMO_CONSOLE_EMAIL` only; tests assert DEBUG stays False and hosts/CORS stay closed. Live API runs
+    `config.settings.prod` (verified: DEBUG off, HSTS, HTTPS redirect).
 
 - [ ] **DEP-03 · P1 · There is no CI**
   - **Acceptable solution:** `.github/workflows/ci.yml` with Postgres and Redis service containers running
