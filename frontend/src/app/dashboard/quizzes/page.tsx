@@ -6,20 +6,25 @@ import { notify } from "@/components/auth/ToastProvider";
 import { formatApiErrorMessage } from "@/lib/axios-client";
 import { QuizzesView } from "@/components/dashboard/views/QuizzesView";
 import {
-  useDocuments,
+  useDecks,
+  useFlashcards,
   useQuizSessions,
-  useStartQuiz,
+  useStartDeckQuiz,
 } from "@/lib/use-dashboard-queries";
 
 export default function QuizzesPage() {
   const router = useRouter();
-  const documentsQuery = useDocuments();
+  const decksQuery = useDecks();
+  const flashcardsQuery = useFlashcards();
   const quizSessionsQuery = useQuizSessions();
-  const startQuizMutation = useStartQuiz();
+  const startDeckQuizMutation = useStartDeckQuiz();
 
-  const handleStartQuiz = async (docId: string) => {
+  const handleStartQuiz = async (deckId: string, questionCount: number) => {
     try {
-      const session = await startQuizMutation.mutateAsync(docId);
+      const session = await startDeckQuizMutation.mutateAsync({
+        deckId,
+        questionCount,
+      });
       router.push(`/dashboard/quizzes/${session.id}`);
       return session;
     } catch (err: unknown) {
@@ -30,16 +35,21 @@ export default function QuizzesPage() {
 
   return (
     <QuizzesView
-      documents={documentsQuery.data}
+      decks={decksQuery.data}
+      flashcards={flashcardsQuery.data}
       quizSessions={quizSessionsQuery.data}
-      isLoading={quizSessionsQuery.isLoading || documentsQuery.isLoading}
-      isError={quizSessionsQuery.isError}
+      isLoading={
+        quizSessionsQuery.isLoading ||
+        decksQuery.isLoading ||
+        flashcardsQuery.isLoading
+      }
+      isError={quizSessionsQuery.isError || decksQuery.isError}
       onRetry={() => {
         quizSessionsQuery.refetch();
-        documentsQuery.refetch();
+        decksQuery.refetch();
+        flashcardsQuery.refetch();
       }}
       onStartQuiz={handleStartQuiz}
-      onNavigateDocuments={() => router.push("/dashboard/documents")}
     />
   );
 }

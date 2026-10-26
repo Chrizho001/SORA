@@ -552,7 +552,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
   - **Acceptable solution:** a shared confirm dialog naming what will be lost.
   - **Prompt:** P-17
 
-- [ ] **FE-17 · P1 · Quiz UX gaps**
+- [x] **FE-17 · P1 · Quiz UX gaps**
   - **Where:** `QuizzesView.tsx`.
   - **Problem:**
     - Decks or documents that can't be quizzed are offered.

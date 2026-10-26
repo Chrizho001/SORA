@@ -305,21 +305,24 @@ export const flashcardsApi = {
 
 export interface QuizQuestionItem {
   id: string;
+  position?: number;
   question_text: string;
   choices: string[];
-  selected_choice: string | null;
-  is_correct: boolean | null;
+  selected_choice?: string | null;
+  is_correct?: boolean | null;
   correct_answer?: string;
 }
 
 export interface QuizSession {
   id: string;
-  document: string;
+  deck?: string | null;
+  deck_title?: string;
+  document?: string | null;
   score: number | null;
   total_questions: number;
   created_at: string;
   finished_at: string | null;
-  questions: QuizQuestionItem[];
+  questions?: QuizQuestionItem[];
 }
 
 export const quizzesApi = {
