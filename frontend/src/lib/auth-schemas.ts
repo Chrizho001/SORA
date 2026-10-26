@@ -116,3 +116,41 @@ export const resendVerificationSchema = z.object({
 export type ResendVerificationFormData = z.infer<
   typeof resendVerificationSchema
 >;
+
+/**
+ * Change Password Schema
+ * POST /api/v1/auth/password/change/
+ */
+export const changePasswordSchema = z
+  .object({
+    old_password: z.string().min(1, "Current password is required"),
+    new_password: passwordValidation,
+    new_password_confirm: z
+      .string()
+      .min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.new_password === data.new_password_confirm, {
+    message: "New passwords do not match",
+    path: ["new_password_confirm"],
+  });
+
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+
+/**
+ * Profile Update Schema
+ * PATCH /api/v1/auth/me/
+ */
+export const profileUpdateSchema = z.object({
+  first_name: z
+    .string()
+    .trim()
+    .min(1, "First name is required")
+    .max(150, "First name cannot exceed 150 characters"),
+  last_name: z
+    .string()
+    .trim()
+    .min(1, "Last name is required")
+    .max(150, "Last name cannot exceed 150 characters"),
+});
+
+export type ProfileUpdateFormData = z.infer<typeof profileUpdateSchema>;

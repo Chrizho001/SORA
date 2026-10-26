@@ -54,6 +54,18 @@ export const notify = {
       }
     );
   },
+  warning: (message: string, title?: string, options?: ToastOptions) => {
+    toast.warning(
+      <div>
+        {title && <div className="font-semibold font-display text-amber-600">{title}</div>}
+        <div className="text-amber-950 text-xs mt-0.5">{message}</div>
+      </div>,
+      {
+        icon: <span>⚠️</span>,
+        ...options,
+      }
+    );
+  },
   info: (message: string, title?: string, options?: ToastOptions) => {
     toast.info(
       <div>

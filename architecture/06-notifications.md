@@ -10,8 +10,8 @@ The rest of this document describes the full target architecture. v1 delivers th
 |---|---|---|
 | In-app notifications (list, mark read, mark all read, unread count) | ✅ backend · ✅ frontend | `NotificationViewSet` · `NotificationsView`, `NotificationDrawer` |
 | Notification types | `TASK_DUE_SOON`, `TASK_OVERDUE`, `PDF_SUMMARY_READY`, `PDF_SUMMARY_FAILED`, `FLASHCARDS_READY`, `FLASHCARDS_FAILED` (new), `QUIZ_READY`, `QUIZ_GRADED`, `SECURITY_NEW_LOGIN`, `SECURITY_PASSWORD_CHANGED`, `SECURITY_EMAIL_CHANGED` | `models.NotificationType`; the frontend mapping must mirror it exactly (Code_Review FE-10) |
-| Per-type preferences (in-app / push) | ✅ backend · ⏳ frontend (FE-14) | `NotificationPreferenceViewSet` |
-| Web push (VAPID) | ✅ backend (`send_web_push_task`, HTTPS endpoint allowlist) · ⏳ SW + subscribe UI (FE-01, FE-14) | `PushSubscriptionViewSet` |
+| Per-type preferences (in-app / push) | ✅ backend · ✅ frontend (FE-14) | `NotificationPreferenceViewSet` |
+| Web push (VAPID) | ✅ backend (`send_web_push_task`, HTTPS endpoint allowlist) · ✅ SW + subscribe UI (FE-01, FE-14) | `PushSubscriptionViewSet` |
 | Scheduled: task due-soon / overdue | ✅ due-soon · ⏳ overdue (BUG-07) | Celery beat `send_due_task_reminders` (15 min) |
 | Push dispatch after commit, failures never break the caller | ⏳ (BUG-09) | `NotificationService.notify` |
 | Broadcast / admin notifications, `notification_deliveries` table, templates registry, email channel | ❌ out of scope for v1 | — |

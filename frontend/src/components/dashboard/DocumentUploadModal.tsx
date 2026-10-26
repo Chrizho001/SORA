@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Sparkles,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
 import { SoraMascot } from "@/components/auth/SoraMascot";
 import { formatApiErrorMessage } from "@/lib/axios-client";
@@ -16,7 +17,7 @@ import { formatApiErrorMessage } from "@/lib/axios-client";
 interface DocumentUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpload: (file: File) => Promise<unknown>;
+  onUpload: (file: File, onProgress?: (percent: number) => void) => Promise<unknown>;
 }
 
 export function DocumentUploadModal({
@@ -28,6 +29,7 @@ export function DocumentUploadModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -81,12 +83,16 @@ export function DocumentUploadModal({
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     setError(null);
 
     try {
-      await onUpload(selectedFile);
+      await onUpload(selectedFile, (percent) => {
+        setUploadProgress(percent);
+      });
       setSelectedFile(null);
       setError(null);
+      setUploadProgress(0);
       onClose();
     } catch (err: unknown) {
       setError(formatApiErrorMessage(err));
@@ -163,20 +169,21 @@ export function DocumentUploadModal({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => !isUploading && fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center space-y-3 ${
             isDragging
               ? "border-[#c8f560] bg-[#c8f560]/10 scale-[1.01]"
               : selectedFile
               ? "border-emerald-300 bg-emerald-50/30"
               : "border-line-strong hover:border-ink hover:bg-canvas/50"
-          }`}
+          } ${isUploading ? "pointer-events-none opacity-80" : ""}`}
         >
           <input
             ref={fileInputRef}
             type="file"
             accept=".pdf,application/pdf"
             onChange={handleFileChange}
+            disabled={isUploading}
             className="hidden"
           />
 
@@ -191,9 +198,11 @@ export function DocumentUploadModal({
               <p className="text-xs text-muted font-body">
                 {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • PDF Document
               </p>
-              <span className="text-[0.6875rem] text-emerald-700 font-display font-medium underline">
-                Click or drag to change file
-              </span>
+              {!isUploading && (
+                <span className="text-[0.6875rem] text-emerald-700 font-display font-medium underline">
+                  Click or drag to change file
+                </span>
+              )}
             </div>
           ) : (
             <>
@@ -215,9 +224,32 @@ export function DocumentUploadModal({
           )}
         </div>
 
+        {/* Upload Progress Bar (FE-20) */}
+        {isUploading && (
+          <div className="space-y-1.5 p-3 rounded-2xl bg-canvas border border-line animate-in fade-in duration-200">
+            <div className="flex items-center justify-between text-xs font-display">
+              <span className="text-muted flex items-center gap-1.5">
+                <Loader2 className="size-3 animate-spin text-[#141413]" />
+                <span>
+                  {uploadProgress < 100
+                    ? "Uploading PDF to server..."
+                    : "Processing lecture upload..."}
+                </span>
+              </span>
+              <span className="font-bold text-ink">{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-line/60 overflow-hidden">
+              <div
+                className="h-full bg-[#c8f560] transition-all duration-150 rounded-full"
+                style={{ width: `${Math.max(5, uploadProgress)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="pt-2 flex items-center justify-between">
-          {error && selectedFile ? (
+          {error && selectedFile && !isUploading ? (
             <button
               type="button"
               onClick={() => {
@@ -238,7 +270,7 @@ export function DocumentUploadModal({
               type="button"
               onClick={onClose}
               disabled={isUploading}
-              className="px-4 py-2.5 rounded-xl border border-line text-xs font-display font-semibold text-muted hover:text-ink hover:bg-mist transition-colors"
+              className="px-4 py-2.5 rounded-xl border border-line text-xs font-display font-semibold text-muted hover:text-ink hover:bg-mist transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
@@ -246,9 +278,10 @@ export function DocumentUploadModal({
               type="button"
               onClick={handleUploadSubmit}
               disabled={!selectedFile || isUploading}
-              className="px-5 py-2.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-md transition-transform active:scale-95 disabled:opacity-40"
+              className="px-5 py-2.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-md transition-transform active:scale-95 disabled:opacity-40 inline-flex items-center gap-2"
             >
-              {isUploading ? "Uploading & Analyzing..." : "Start AI Summary"}
+              {isUploading && <Loader2 className="size-3.5 animate-spin" />}
+              <span>{isUploading ? "Uploading..." : "Start AI Summary"}</span>
             </button>
           </div>
         </div>

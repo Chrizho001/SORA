@@ -1,71 +1,114 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
   Check,
-  Clock,
   Sparkles,
-  BookOpen,
-  Brain,
-  Zap,
+  Loader2,
 } from "lucide-react";
 import { NotificationItem } from "@/lib/dashboard-api";
+import {
+  getNotificationConfig,
+  TONE_BADGE_CLASSES,
+} from "@/lib/notification-types";
 import { MascotGuide } from "../MascotGuide";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface NotificationsViewProps {
-  notifications: NotificationItem[];
+  notifications?: NotificationItem[];
+  isLoading?: boolean;
+  isError?: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
+  onRetry?: () => void;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
   onNavigateTab?: (tab: "documents" | "flashcards" | "quizzes" | "tasks") => void;
 }
 
-const NOTIFICATION_CONFIG: Record<
-  string,
-  { icon: React.ReactNode; badge: string; color: string }
-> = {
-  DOCUMENT_SUMMARY_SUCCESS: {
-    icon: <BookOpen className="size-4.5 text-emerald-600" />,
-    badge: "Summary Ready",
-    color: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  },
-  DOCUMENT_SUMMARY_FAILED: {
-    icon: <BookOpen className="size-4.5 text-rose-600" />,
-    badge: "Summary Error",
-    color: "bg-rose-50 text-rose-800 border-rose-200",
-  },
-  FLASHCARD_GENERATION_SUCCESS: {
-    icon: <Brain className="size-4.5 text-purple-600" />,
-    badge: "Flashcards Ready",
-    color: "bg-purple-50 text-purple-800 border-purple-200",
-  },
-  FLASHCARD_GENERATION_FAILED: {
-    icon: <Brain className="size-4.5 text-rose-600" />,
-    badge: "Flashcard Error",
-    color: "bg-rose-50 text-rose-800 border-rose-200",
-  },
-  QUIZ_SESSION_COMPLETED: {
-    icon: <Zap className="size-4.5 text-amber-600" />,
-    badge: "Quiz Finished",
-    color: "bg-amber-50 text-amber-800 border-amber-200",
-  },
-  TASK_DUE_SOON: {
-    icon: <Clock className="size-4.5 text-sky-600" />,
-    badge: "Deadline Approaching",
-    color: "bg-sky-50 text-sky-800 border-sky-200",
-  },
-};
-
 export function NotificationsView({
   notifications,
+  isLoading,
+  isError,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+  onRetry,
   onMarkRead,
   onMarkAllRead,
 }: NotificationsViewProps) {
+  const router = useRouter();
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
-  const filteredNotifications = notifications.filter((n) =>
+  const handleNotificationClick = (notif: NotificationItem) => {
+    const notifType = notif.type || notif.notification_type || "";
+    const config = getNotificationConfig(notifType);
+    if (!notif.read_at) {
+      onMarkRead(notif.id);
+    }
+    const href = config.href(notif.data);
+    router.push(href);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-full" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+              Study Alerts & Activity Logs
+            </h1>
+            <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
+              Live updates when your AI summaries finish, cards are created, or assignment deadlines approach.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <Bell className="size-10 text-rose-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-display font-bold text-base text-ink">Failed to load notifications</h3>
+            <p className="text-xs text-muted max-w-sm mx-auto font-body">
+              An error occurred while fetching your alerts.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeNotifications = notifications ?? [];
+  const unreadCount = safeNotifications.filter((n) => !n.read_at).length;
+  const filteredNotifications = safeNotifications.filter((n) =>
     filter === "unread" ? !n.read_at : true
   );
 
@@ -122,7 +165,7 @@ export function NotificationsView({
                   : "bg-canvas text-muted hover:text-ink hover:bg-mist"
               }`}
             >
-              All Alerts ({notifications.length})
+              All Alerts ({safeNotifications.length})
             </button>
             <button
               type="button"
@@ -161,42 +204,45 @@ export function NotificationsView({
         ) : (
           <div className="space-y-3">
             {filteredNotifications.map((notif) => {
-              const config = NOTIFICATION_CONFIG[notif.notification_type] || {
-                icon: <Bell className="size-4.5 text-ink" />,
-                badge: "System Alert",
-                color: "bg-canvas text-ink border-line",
-              };
+              const notifType = notif.type || notif.notification_type || "";
+              const config = getNotificationConfig(notifType);
+              const Icon = config.icon;
+              const badgeClass = TONE_BADGE_CLASSES[config.tone] || "bg-canvas text-ink border-line";
+              const messageText = notif.body || notif.message || "";
               const isUnread = !notif.read_at;
 
               return (
                 <div
                   key={notif.id}
-                  className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  onClick={() => handleNotificationClick(notif)}
+                  className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group ${
                     isUnread
-                      ? "bg-emerald-50/20 border-emerald-300/70 shadow-xs"
-                      : "bg-surface hover:bg-canvas/40 border-line opacity-75"
+                      ? "bg-emerald-50/20 border-emerald-300/70 shadow-xs hover:border-emerald-400"
+                      : "bg-surface hover:bg-canvas/50 border-line opacity-80 hover:opacity-100"
                   }`}
                 >
                   <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                    <div className="size-10 rounded-2xl bg-surface border border-line flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                      {config.icon}
+                    <div className="size-10 rounded-2xl bg-surface border border-line flex items-center justify-center shrink-0 shadow-2xs mt-0.5 group-hover:scale-105 transition-transform">
+                      <Icon className="size-4.5 text-ink" />
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[0.625rem] font-display font-bold border ${config.color}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[0.625rem] font-display font-bold border ${badgeClass}`}
                         >
-                          {config.badge}
+                          {config.label}
                         </span>
-                        <h4 className="font-display font-bold text-xs sm:text-sm text-ink truncate">
+                        <h4 className="font-display font-bold text-xs sm:text-sm text-ink truncate group-hover:text-black">
                           {notif.title}
                         </h4>
                       </div>
 
-                      <p className="text-xs text-muted font-body mt-1 leading-relaxed">
-                        {notif.message}
-                      </p>
+                      {messageText && (
+                        <p className="text-xs text-muted font-body mt-1 leading-relaxed line-clamp-2">
+                          {messageText}
+                        </p>
+                      )}
 
                       <span className="text-[0.6875rem] text-subtle font-body mt-1.5 block">
                         {new Date(notif.created_at).toLocaleString([], {
@@ -214,7 +260,10 @@ export function NotificationsView({
                     {isUnread && (
                       <button
                         type="button"
-                        onClick={() => onMarkRead(notif.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMarkRead(notif.id);
+                        }}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-canvas hover:bg-mist text-ink text-xs font-display font-semibold border border-line transition-all duration-200 hover:scale-105 active:scale-95"
                       >
                         <Check className="size-3.5 text-emerald-600" />
@@ -225,6 +274,21 @@ export function NotificationsView({
                 </div>
               );
             })}
+
+            {/* Load More Button (FE-06) */}
+            {hasNextPage && (
+              <div className="pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={onLoadMore}
+                  disabled={isFetchingNextPage}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-canvas hover:bg-mist text-ink text-xs font-display font-semibold border border-line shadow-xs transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isFetchingNextPage && <Loader2 className="size-3.5 animate-spin" />}
+                  <span>{isFetchingNextPage ? "Loading more..." : "Load More Notifications"}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

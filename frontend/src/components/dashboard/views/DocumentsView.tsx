@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   FileText,
   Plus,
@@ -15,12 +16,17 @@ import {
   RotateCw,
   Sparkles,
 } from "lucide-react";
-import { DocumentItem } from "@/lib/dashboard-api";
+import { DocumentItem, Deck } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
 import { FormattedSummary, stripMarkdown } from "../FormattedSummary";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface DocumentsViewProps {
-  documents: DocumentItem[];
+  documents?: DocumentItem[];
+  decks?: Deck[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onUploadClick: () => void;
   onGenerateFlashcards: (docId: string) => void;
   onStartQuiz: (docId: string) => void;
@@ -30,6 +36,10 @@ interface DocumentsViewProps {
 
 export function DocumentsView({
   documents,
+  decks,
+  isLoading,
+  isError,
+  onRetry,
   onUploadClick,
   onGenerateFlashcards,
   onStartQuiz,
@@ -37,6 +47,71 @@ export function DocumentsView({
   onRetryDocument,
 }: DocumentsViewProps) {
   const [selectedSummaryDoc, setSelectedSummaryDoc] = useState<DocumentItem | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setCurrentTime(Date.now()), 0);
+    const interval = setInterval(() => setCurrentTime(Date.now()), 15000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-32 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-56 rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+              PDF & Lecture Documents
+            </h1>
+            <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
+              Upload syllabi, lecture slides, diagrams, or textbook chapters to generate multimodal AI summaries and flashcards.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <AlertCircle className="size-10 text-rose-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-display font-bold text-base text-ink">Failed to load documents</h3>
+            <p className="text-xs text-muted max-w-sm mx-auto font-body">
+              An error occurred while communicating with the study server.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <RotateCw className="size-3.5" />
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeDocuments = documents ?? [];
 
   return (
     <div className="space-y-6 pb-16">
@@ -69,7 +144,7 @@ export function DocumentsView({
       />
 
       {/* Document Library Grid */}
-      {documents.length === 0 ? (
+      {safeDocuments.length === 0 ? (
         <div className="rounded-3xl bg-surface border border-line p-12 text-center space-y-4 shadow-soft">
           <div className="size-16 rounded-3xl bg-canvas text-subtle mx-auto flex items-center justify-center">
             <UploadCloud className="size-8 text-muted" />
@@ -91,13 +166,21 @@ export function DocumentsView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {documents.map((doc) => {
+          {safeDocuments.map((doc) => {
             const isDone = doc.status === "DONE";
             const isProcessing = doc.status === "PROCESSING" || doc.status === "UPLOADED";
             const isFailed = doc.status === "FAILED";
-            const hasFlashcards = doc.flashcard_generation_status === "DONE";
             const isFlashcardsGenerating = doc.flashcard_generation_status === "GENERATING";
             const isFlashcardsFailed = doc.flashcard_generation_status === "FAILED";
+            const linkedDeck = (decks ?? []).find((d) => d.document === doc.id);
+            const hasFlashcards =
+              doc.flashcard_generation_status === "DONE" ||
+              (linkedDeck !== undefined && linkedDeck.card_count > 0);
+            const now = currentTime || 0;
+            const startTime = doc.processing_started_at
+              ? new Date(doc.processing_started_at).getTime()
+              : new Date(doc.created_at).getTime();
+            const isStuck = isProcessing && now > 0 && now - startTime > 10 * 60 * 1000;
 
             return (
               <div
@@ -105,6 +188,8 @@ export function DocumentsView({
                 className={`rounded-3xl bg-surface border transition-all duration-300 p-5 shadow-soft flex flex-col justify-between hover:shadow-lift hover:-translate-y-0.5 ${
                   isFailed
                     ? "border-rose-200/90 bg-rose-50/10"
+                    : isStuck
+                    ? "border-amber-300/90 bg-amber-50/10"
                     : isProcessing
                     ? "border-sky-200/90"
                     : "border-line"
@@ -117,12 +202,16 @@ export function DocumentsView({
                       className={`size-11 rounded-2xl flex items-center justify-center shrink-0 border ${
                         isFailed
                           ? "bg-rose-50 border-rose-200 text-rose-600"
+                          : isStuck
+                          ? "bg-amber-50 border-amber-200 text-amber-700"
                           : isProcessing
                           ? "bg-sky-50 border-sky-200 text-sky-600"
                           : "bg-emerald-50 border-emerald-200 text-emerald-600"
                       }`}
                     >
-                      {isProcessing ? (
+                      {isStuck ? (
+                        <AlertCircle className="size-5 text-amber-600" />
+                      ) : isProcessing ? (
                         <FileText className="size-5 animate-pulse" />
                       ) : isFailed ? (
                         <AlertCircle className="size-5" />
@@ -132,11 +221,15 @@ export function DocumentsView({
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      {isProcessing && (
+                      {isStuck ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-[0.6875rem] font-display font-semibold">
+                          Taking longer than expected
+                        </span>
+                      ) : isProcessing ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[0.6875rem] font-display font-semibold animate-pulse">
                           Processing PDF...
                         </span>
-                      )}
+                      ) : null}
                       {isDone && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[0.6875rem] font-display font-semibold">
                           Summary Ready
@@ -147,11 +240,24 @@ export function DocumentsView({
                           Analysis Failed
                         </span>
                       )}
-                      {hasFlashcards && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-[0.6875rem] font-display font-semibold">
-                          5 Flashcards
-                        </span>
-                      )}
+                      {linkedDeck ? (
+                        <Link
+                          href={`/dashboard/flashcards/${linkedDeck.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-[0.6875rem] font-display font-semibold transition-colors"
+                          title="View flashcard deck"
+                        >
+                          <Brain className="size-3" />
+                          <span>Deck ({linkedDeck.card_count})</span>
+                        </Link>
+                      ) : hasFlashcards ? (
+                        <Link
+                          href="/dashboard/flashcards"
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-[0.6875rem] font-display font-semibold transition-colors"
+                        >
+                          <Brain className="size-3" />
+                          <span>Flashcards Deck</span>
+                        </Link>
+                      ) : null}
                       {isFlashcardsFailed && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[0.6875rem] font-display font-semibold">
                           Flashcards Issue
@@ -186,6 +292,19 @@ export function DocumentsView({
                     </div>
                   )}
 
+                  {/* Taking longer than expected message (FE-20) */}
+                  {isStuck && (
+                    <div className="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-xs font-body text-amber-800 space-y-1">
+                      <div className="font-display font-semibold flex items-center gap-1.5 text-amber-900">
+                        <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+                        <span>Taking longer than expected</span>
+                      </div>
+                      <p className="text-[0.6875rem] text-amber-700 leading-relaxed">
+                        Document analysis has been running for more than 10 minutes. Click Retry to restart analysis.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Error explanation if summary failed */}
                   {isFailed && (
                     <div className="mt-3 p-3 rounded-2xl bg-rose-50 border border-rose-200/80 text-xs font-body text-rose-800 space-y-1">
@@ -215,14 +334,14 @@ export function DocumentsView({
 
                 {/* Bottom Actions */}
                 <div className="pt-3 border-t border-line flex flex-wrap items-center gap-2 mt-4">
-                  {isFailed && onRetryDocument && (
+                  {(isFailed || isStuck) && onRetryDocument && (
                     <button
                       type="button"
                       onClick={() => onRetryDocument(doc.id)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold transition-all hover:scale-105 active:scale-95 shadow-xs"
                     >
                       <RotateCw className="size-3.5" />
-                      <span>Retry AI Analysis</span>
+                      <span>{isStuck ? "Retry Analysis" : "Retry AI Analysis"}</span>
                     </button>
                   )}
 
@@ -248,7 +367,15 @@ export function DocumentsView({
                     </button>
                   )}
 
-                  {isDone && !hasFlashcards && (
+                  {linkedDeck ? (
+                    <Link
+                      href={`/dashboard/flashcards/${linkedDeck.id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-display font-semibold hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <Brain className="size-3.5 text-purple-600" />
+                      <span>Flashcards ({linkedDeck.card_count})</span>
+                    </Link>
+                  ) : isDone && (
                     <button
                       type="button"
                       onClick={() => onGenerateFlashcards(doc.id)}

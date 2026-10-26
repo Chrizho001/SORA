@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useTransition, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthCardLayout } from "@/components/auth/AuthCardLayout";
 import { AuthInput } from "@/components/auth/AuthInput";
 import { AuthButton } from "@/components/auth/AuthButton";
@@ -13,10 +13,19 @@ import { loginSchema, LoginFormData } from "@/lib/auth-schemas";
 import { authApi, AuthApiError } from "@/lib/auth-api";
 import { useAuth } from "@/lib/auth-context";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const expired = searchParams.get("expired");
   const { login } = useAuth();
   const [isPending, startTransition] = useTransition();
+
+  // Show expired toast on mount if ?expired=1
+  useEffect(() => {
+    if (expired === "1") {
+      notify.info("Your session expired — please sign in again", "Session Expired");
+    }
+  }, [expired]);
 
   // Form State
   const [formData, setFormData] = useState<LoginFormData>({
@@ -136,9 +145,15 @@ export default function LoginPage() {
           "Signed In Successfully"
         );
 
-        // Redirect to dashboard
+        // Redirect to target or dashboard
+        const rawNext = searchParams?.get("next");
+        const targetUrl =
+          rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("\\")
+            ? rawNext
+            : "/dashboard";
+
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push(targetUrl);
         }, 800);
       } catch (err: unknown) {
         setLastSubmissionFailed(true);
@@ -182,6 +197,8 @@ export default function LoginPage() {
     );
   };
 
+  const rawNext = searchParams?.get("next");
+
   return (
     <AuthCardLayout
       title="Welcome back"
@@ -191,7 +208,7 @@ export default function LoginPage() {
       footerLink={{
         prompt: "Don't have an account?",
         label: "Sign up for free",
-        href: "/signup",
+        href: rawNext ? `/signup?next=${encodeURIComponent(rawNext)}` : "/signup",
       }}
       secondaryLink={{
         label: "Need help?",
@@ -279,5 +296,21 @@ export default function LoginPage() {
         </form>
       </div>
     </AuthCardLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-dvh flex items-center justify-center bg-paper">
+          <div className="text-center font-display text-muted text-sm animate-pulse">
+            Loading...
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

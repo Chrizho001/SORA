@@ -1,82 +1,142 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Zap,
   Play,
-  CheckCircle2,
-  XCircle,
   Trophy,
-  BookOpen,
   AlertCircle,
+  RotateCw,
+  Clock,
+  Layers,
+  ChevronRight,
 } from "lucide-react";
-import { DocumentItem, QuizSession } from "@/lib/dashboard-api";
+import { Deck, Flashcard, QuizSession } from "@/lib/dashboard-api";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { formatApiErrorMessage } from "@/lib/axios-client";
-import { MascotGuide } from "../MascotGuide";
+import { notify } from "@/components/auth/ToastProvider";
 
 interface QuizzesViewProps {
-  documents: DocumentItem[];
-  quizSessions: QuizSession[];
-  onStartQuiz: (docId: string) => Promise<QuizSession>;
-  onSubmitQuiz: (
-    sessionId: string,
-    answers: { question_id: string; selected_choice: string }[]
-  ) => Promise<QuizSession>;
-  onNavigateDocuments: () => void;
+  decks?: Deck[];
+  flashcards?: Flashcard[];
+  quizSessions?: QuizSession[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  onStartQuiz: (deckId: string, questionCount: number) => Promise<QuizSession>;
+}
+
+// Normalise answers according to the spec: " ".join(a.casefold().split())
+function normaliseAnswer(answer: string): string {
+  return answer.toLowerCase().trim().split(/\s+/).filter(Boolean).join(" ");
 }
 
 export function QuizzesView({
-  documents,
+  decks,
+  flashcards,
   quizSessions,
+  isLoading,
+  isError,
+  onRetry,
   onStartQuiz,
-  onSubmitQuiz,
-  onNavigateDocuments,
 }: QuizzesViewProps) {
-  const [activeSession, setActiveSession] = useState<QuizSession | null>(null);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isStarting, setIsStarting] = useState(false);
+  const router = useRouter();
+
+  // Per-deck selected question counts (default 10)
+  const [deckQuestionCounts, setDeckQuestionCounts] = useState<Record<string, number>>({});
+  const [startingDeckId, setStartingDeckId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleStartNewQuiz = async (docId: string) => {
-    setIsStarting(true);
+  // Group flashcards by deck to compute distinct answers count client-side
+  const deckCardsMap = useMemo(() => {
+    const map = new Map<string, Flashcard[]>();
+    (flashcards ?? []).forEach((card) => {
+      if (card.deck) {
+        const list = map.get(card.deck) ?? [];
+        list.push(card);
+        map.set(card.deck, list);
+      }
+    });
+    return map;
+  }, [flashcards]);
+
+  const handleStart = async (deckId: string, count: number) => {
+    setStartingDeckId(deckId);
     setError(null);
     try {
-      const session = await onStartQuiz(docId);
-      setActiveSession(session);
-      setSelectedAnswers({});
+      const session = await onStartQuiz(deckId, count);
+      router.push(`/dashboard/quizzes/${session.id}`);
     } catch (err: unknown) {
-      setError(formatApiErrorMessage(err));
+      const msg = formatApiErrorMessage(err);
+      setError(msg);
+      notify.error(msg, "Unable to Start Quiz");
     } finally {
-      setIsStarting(false);
+      setStartingDeckId(null);
     }
   };
 
-  const handleSelectChoice = (questionId: string, choice: string) => {
-    if (activeSession?.finished_at) return; // Locked once finished
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [questionId]: choice,
-    }));
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64 rounded-xl" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-28 rounded-3xl" />
+            ))}
+          </div>
+          <div className="lg:col-span-5 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-24 rounded-3xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const handleSubmit = async () => {
-    if (!activeSession) return;
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const answersPayload = Object.entries(selectedAnswers).map(([qid, choice]) => ({
-        question_id: qid,
-        selected_choice: choice,
-      }));
-      const updatedSession = await onSubmitQuiz(activeSession.id, answersPayload);
-      setActiveSession(updatedSession);
-    } catch (err: unknown) {
-      setError(formatApiErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  if (isError) {
+    return (
+      <div className="space-y-6 pb-16">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
+            Speed Quizzes & Exam Drills
+          </h1>
+          <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
+            Test yourself with multiple-choice quizzes automatically built from your flashcard decks.
+          </p>
+        </div>
+        <div className="rounded-3xl bg-surface border border-rose-200 p-10 text-center space-y-4 shadow-soft">
+          <AlertCircle className="size-10 text-rose-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-display font-bold text-base text-ink">Failed to load quiz sessions</h3>
+            <p className="text-xs text-muted max-w-sm mx-auto font-body">
+              An error occurred while loading your decks and past quiz history.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#14161f] text-[#c8f560] text-xs font-display font-bold hover:bg-night transition-all shadow-md active:scale-95"
+          >
+            <RotateCw className="size-3.5" />
+            <span>Try again</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeDecks = decks ?? [];
+  const safeQuizSessions = quizSessions ?? [];
 
   return (
     <div className="space-y-6 pb-16">
@@ -84,23 +144,13 @@ export function QuizzesView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-display font-bold text-ink tracking-tight">
-            Speed Quizzes & Exam Simulation
+            Speed Quizzes & Exam Drills
           </h1>
           <p className="text-xs sm:text-sm text-muted font-body mt-0.5">
-            Timed multiple-choice drills to benchmark your exam readiness and retain key concepts.
+            Test yourself with multiple-choice quizzes automatically built from your flashcard decks.
           </p>
         </div>
       </div>
-
-      {/* Mascot Section Guide */}
-      <MascotGuide
-        section="quizzes"
-        actionLabel="Start New Quiz"
-        onActionClick={() => {
-          const readyDoc = documents.find((d) => d.status === "DONE");
-          if (readyDoc) handleStartNewQuiz(readyDoc.id);
-        }}
-      />
 
       {/* Error Alert Box */}
       {error && (
@@ -120,211 +170,244 @@ export function QuizzesView({
         </div>
       )}
 
-      {/* Active Quiz Runner if a quiz is in progress */}
-      {activeSession ? (
-        <div className="max-w-2xl mx-auto rounded-3xl bg-surface border border-line p-6 sm:p-8 shadow-soft space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-line">
+      {/* Launch & History View */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Start a Quiz Column (7 cols) */}
+        <div className="lg:col-span-7 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-line">
             <div className="flex items-center gap-2.5">
-              <div className="size-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+              <div className="size-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                 <Zap className="size-4.5" />
               </div>
               <div>
-                <h3 className="font-display font-bold text-base text-ink">
-                  {activeSession.finished_at ? "Quiz Complete!" : "Speed Quiz in Progress"}
-                </h3>
+                <h2 className="font-display font-bold text-base text-ink">Start a Quiz</h2>
                 <p className="text-xs text-muted font-body">
-                  {activeSession.questions.length} questions • Answer all to submit
+                  Choose a flashcard deck to begin multiple-choice test practice.
                 </p>
               </div>
             </div>
 
-            {activeSession.finished_at && (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-display font-bold">
-                <Trophy className="size-3.5 text-emerald-600" />
-                <span>
-                  Score: {activeSession.score} / {activeSession.total_questions}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Question Cards */}
-          <div className="space-y-6">
-            {activeSession.questions.map((q, idx) => {
-              const selected = selectedAnswers[q.id];
-              const isFinished = !!activeSession.finished_at;
-
-              return (
-                <div key={q.id} className="p-4 rounded-2xl bg-canvas/40 border border-line space-y-3">
-                  <p className="font-display font-bold text-sm text-ink">
-                    <span className="text-muted mr-1.5">{idx + 1}.</span> {q.question_text}
-                  </p>
-
-                  <div className="space-y-2">
-                    {q.choices.map((choice, cIdx) => {
-                      const isChoiceSelected = selected === choice;
-                      const isCorrect = isFinished && choice === q.correct_answer;
-                      const isWrong = isFinished && isChoiceSelected && !q.is_correct;
-
-                      return (
-                        <button
-                          key={cIdx}
-                          type="button"
-                          onClick={() => handleSelectChoice(q.id, choice)}
-                          disabled={isFinished}
-                          className={`w-full text-left p-3 rounded-xl border text-xs font-body transition-all duration-150 active:scale-[0.99] flex items-center justify-between ${
-                            isCorrect
-                              ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold shadow-xs"
-                              : isWrong
-                              ? "bg-rose-50 border-rose-400 text-rose-900 shadow-xs"
-                              : isChoiceSelected
-                              ? "bg-night text-[#c8f560] border-night font-semibold shadow-sm scale-[1.01]"
-                              : "bg-surface hover:bg-mist hover:border-line-strong text-ink"
-                          }`}
-                        >
-                          <span>{choice}</span>
-                          {isCorrect && <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />}
-                          {isWrong && <XCircle className="size-4 text-rose-600 shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Submit Action */}
-          <div className="pt-4 border-t border-line flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setActiveSession(null)}
-              className="text-xs font-display text-muted hover:text-ink"
+            <Link
+              href="/dashboard/flashcards"
+              className="text-xs font-display font-semibold text-purple-700 hover:text-purple-900 transition-colors"
             >
-              ← Back to Quiz List
-            </button>
-
-            {!activeSession.finished_at ? (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting || Object.keys(selectedAnswers).length === 0}
-                className="px-6 py-2.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-md transition-transform active:scale-95 disabled:opacity-40"
-              >
-                {isSubmitting ? "Grading..." : "Submit Answers"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setActiveSession(null)}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-display font-bold shadow-md transition-transform active:scale-95"
-              >
-                Done
-              </button>
-            )}
+              Manage Decks
+            </Link>
           </div>
-        </div>
-      ) : (
-        /* Launch & History View */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Start New Quiz Column (7 cols) */}
-          <div className="lg:col-span-7 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-4">
-            <div className="flex items-center gap-2">
-              <Zap className="size-5 text-amber-500" />
-              <h3 className="font-display font-bold text-base text-ink">
-                Start Quiz from Lecture Document
-              </h3>
-            </div>
 
-            <p className="text-xs text-muted font-body">
-              Select any analyzed document with generated flashcards to begin a 5-question speed quiz.
-            </p>
-
-            {documents.filter((d) => d.status === "DONE").length === 0 ? (
-              <div className="py-8 text-center space-y-2">
-                <BookOpen className="size-8 text-subtle mx-auto" />
-                <p className="text-xs font-display font-medium text-ink">No ready documents found</p>
-                <p className="text-[0.6875rem] text-muted max-w-xs mx-auto">
-                  Upload a PDF document first so SORA can extract multiple-choice questions.
-                </p>
-                <button
-                  type="button"
-                  onClick={onNavigateDocuments}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-night text-[#c8f560] text-xs font-display font-semibold"
-                >
-                  Go to Documents
-                </button>
+          {safeDecks.length === 0 ? (
+            <div className="py-10 text-center space-y-3">
+              <div className="size-12 rounded-2xl bg-purple-50 text-purple-600 mx-auto flex items-center justify-center">
+                <Layers className="size-6" />
               </div>
-            ) : (
-              <div className="space-y-2.5">
-                {documents
-                  .filter((d) => d.status === "DONE")
-                  .map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3.5 rounded-2xl bg-canvas/40 border border-line"
-                    >
-                      <div className="min-w-0 flex-1 pr-3">
-                        <p className="font-display font-bold text-xs sm:text-sm text-ink truncate">
-                          {doc.original_name}
+              <div className="space-y-1">
+                <h3 className="font-display font-bold text-sm text-ink">No flashcard decks yet</h3>
+                <p className="text-xs text-muted max-w-xs mx-auto font-body">
+                  Create a flashcard deck first or generate one from your lecture PDFs to unlock multiple-choice drills.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/flashcards"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-night text-[#c8f560] text-xs font-display font-bold hover:bg-ink transition-all shadow-sm"
+              >
+                <span>Create First Deck</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {safeDecks.map((deck) => {
+                // Compute distinct answers
+                const cards = deckCardsMap.get(deck.id) ?? [];
+                const distinctSet = new Set<string>();
+                cards.forEach((c) => {
+                  const norm = normaliseAnswer(c.answer);
+                  if (norm) distinctSet.add(norm);
+                });
+                const distinctCount = distinctSet.size;
+
+                const hasFewerThan4Cards = deck.card_count < 4;
+                const hasFewerThan4Distinct =
+                  cards.length > 0 ? distinctCount < 4 : deck.card_count < 4;
+                const isDisabled = hasFewerThan4Cards || hasFewerThan4Distinct || startingDeckId !== null;
+
+                const disabledReason = hasFewerThan4Cards
+                  ? `Deck needs at least 4 flashcards (currently ${deck.card_count})`
+                  : hasFewerThan4Distinct
+                  ? `Deck needs at least 4 distinct answers (currently ${distinctCount})`
+                  : "";
+
+                const selectedCount = deckQuestionCounts[deck.id] ?? 10;
+                const isStartingThis = startingDeckId === deck.id;
+
+                return (
+                  <div
+                    key={deck.id}
+                    className="p-4 rounded-2xl bg-canvas/40 border border-line hover:border-line/80 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/flashcards/${deck.id}`}
+                          className="font-display font-bold text-sm text-ink hover:text-purple-700 transition-colors truncate"
+                        >
+                          {deck.title}
+                        </Link>
+                        {deck.document_name && (
+                          <span
+                            className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-canvas border border-line text-[0.625rem] text-muted truncate max-w-[120px]"
+                            title={deck.document_name}
+                          >
+                            {deck.document_name}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-muted font-display">
+                        <span>
+                          {deck.card_count} {deck.card_count === 1 ? "card" : "cards"}
+                        </span>
+                        {cards.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className={distinctCount < 4 ? "text-amber-700 font-semibold" : ""}>
+                              {distinctCount} distinct {distinctCount === 1 ? "answer" : "answers"}
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {isDisabled && disabledReason && (
+                        <p className="text-[0.6875rem] text-amber-800 font-body flex items-center gap-1 pt-0.5">
+                          <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                          <span>{disabledReason}</span>
                         </p>
-                        <p className="text-[0.6875rem] text-muted mt-0.5">
-                          {doc.page_count ? `${doc.page_count} pages` : "Lecture Document"}
-                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                      <div className="inline-flex items-center rounded-xl bg-surface border border-line p-0.5">
+                        <select
+                          value={selectedCount}
+                          onChange={(e) =>
+                            setDeckQuestionCounts((prev) => ({
+                              ...prev,
+                              [deck.id]: Number(e.target.value),
+                            }))
+                          }
+                          disabled={isDisabled}
+                          aria-label={`Question count for ${deck.title}`}
+                          className="h-8 pl-2 pr-1 rounded-lg bg-transparent text-xs font-display font-semibold text-ink focus:outline-none disabled:opacity-40"
+                        >
+                          <option value={5}>5 Qs</option>
+                          <option value={10}>10 Qs</option>
+                          <option value={20}>20 Qs</option>
+                        </select>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => handleStartNewQuiz(doc.id)}
-                        disabled={isStarting}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-xs transition-transform active:scale-95 disabled:opacity-50"
+                        onClick={() => handleStart(deck.id, selectedCount)}
+                        disabled={isDisabled}
+                        title={disabledReason || `Start a ${selectedCount}-question speed quiz`}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-night hover:bg-ink text-[#c8f560] text-xs font-display font-bold shadow-sm transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <Play className="size-3 fill-current" />
-                        <span>Start</span>
+                        {isStartingThis ? (
+                          <RotateCw className="size-3.5 animate-spin" />
+                        ) : (
+                          <Play className="size-3.5 fill-current" />
+                        )}
+                        <span>{isStartingThis ? "Starting..." : "Start"}</span>
                       </button>
                     </div>
-                  ))}
-              </div>
-            )}
-          </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-          {/* Past Quiz Sessions Column (5 cols) */}
-          <div className="lg:col-span-5 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-4">
+        {/* History Column (5 cols) */}
+        <div className="lg:col-span-5 rounded-3xl bg-surface border border-line p-6 shadow-soft space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-line">
             <div className="flex items-center gap-2">
               <Trophy className="size-5 text-emerald-600" />
-              <h3 className="font-display font-bold text-base text-ink">Recent Quiz Scores</h3>
+              <h2 className="font-display font-bold text-base text-ink">Quiz History</h2>
             </div>
+            <span className="text-xs font-display text-muted">
+              {safeQuizSessions.length} {safeQuizSessions.length === 1 ? "attempt" : "attempts"}
+            </span>
+          </div>
 
-            {quizSessions.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted font-body">
-                No past quiz sessions yet. Start your first drill above!
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {quizSessions.slice(0, 5).map((session) => (
-                  <div
+          {safeQuizSessions.length === 0 ? (
+            <div className="py-10 text-center space-y-2">
+              <Clock className="size-8 text-subtle mx-auto" />
+              <p className="text-xs font-display font-semibold text-ink">No quiz history yet</p>
+              <p className="text-[0.6875rem] text-muted max-w-xs mx-auto font-body">
+                Take your first quiz from the left panel to track your scores and retention over time.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {safeQuizSessions.map((session) => {
+                const isFinished = !!session.finished_at;
+                const score = session.score ?? 0;
+                const total = session.total_questions;
+                const percent = total > 0 ? Math.round((score / total) * 100) : 0;
+                const dateStr = new Date(session.created_at).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+
+                return (
+                  <Link
                     key={session.id}
-                    className="p-3 rounded-2xl bg-canvas/40 border border-line flex items-center justify-between"
+                    href={`/dashboard/quizzes/${session.id}`}
+                    className="p-3.5 rounded-2xl bg-canvas/40 hover:bg-canvas/80 border border-line flex items-center justify-between transition-all group cursor-pointer hover:border-line-strong"
                   >
-                    <div>
-                      <p className="text-xs font-display font-bold text-ink">
-                        Quiz • {new Date(session.created_at).toLocaleDateString()}
+                    <div className="space-y-1 min-w-0 pr-3">
+                      <p className="text-xs font-display font-bold text-ink truncate group-hover:text-purple-700 transition-colors">
+                        {session.deck_title || "Quiz Drill"}
                       </p>
                       <p className="text-[0.6875rem] text-muted font-body">
-                        {session.total_questions} Questions
+                        {dateStr} • {session.total_questions} Qs
                       </p>
                     </div>
 
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-display font-bold">
-                      {session.score ?? 0} / {session.total_questions}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isFinished ? (
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-display font-bold border ${
+                              percent >= 80
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : percent >= 50
+                                ? "bg-sky-50 text-sky-800 border-sky-200"
+                                : "bg-amber-50 text-amber-800 border-amber-200"
+                            }`}
+                          >
+                            {score} / {total} ({percent}%)
+                          </span>
+                          <ChevronRight className="size-3.5 text-muted group-hover:text-ink group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-display font-semibold">
+                            In progress
+                          </span>
+                          <span className="text-xs font-display font-bold text-purple-700 underline group-hover:text-purple-900 transition-colors">
+                            Resume
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -17,6 +17,8 @@ import { Logo } from "@/components/brand/Logo";
 import { PwaInstallCard } from "./PwaInstallCard";
 import { User } from "@/lib/auth-api";
 
+import { usePathname } from "next/navigation";
+
 export type DashboardTab =
   | "dashboard"
   | "documents"
@@ -27,8 +29,8 @@ export type DashboardTab =
   | "settings";
 
 interface SidebarProps {
-  activeTab: DashboardTab;
-  onTabChange: (tab: DashboardTab) => void;
+  activeTab?: DashboardTab;
+  onTabChange?: (tab: DashboardTab) => void;
   user: User;
   unreadCount?: number;
   onLogout: () => void;
@@ -43,47 +45,59 @@ export function Sidebar({
   onLogout,
   isLoggingOut = false,
 }: SidebarProps) {
+  const pathname = usePathname();
+
   const navItems = [
     {
       id: "dashboard" as const,
+      href: "/dashboard",
       label: "Dashboard",
       icon: LayoutDashboard,
     },
     {
       id: "documents" as const,
+      href: "/dashboard/documents",
       label: "Documents",
       icon: BookOpen,
     },
     {
       id: "flashcards" as const,
+      href: "/dashboard/flashcards",
       label: "Flashcards",
       icon: Brain,
     },
     {
       id: "quizzes" as const,
+      href: "/dashboard/quizzes",
       label: "Speed Quizzes",
       icon: Zap,
     },
     {
       id: "tasks" as const,
+      href: "/dashboard/tasks",
       label: "Schedule & Tasks",
       icon: CalendarDays,
     },
     {
       id: "notifications" as const,
+      href: "/dashboard/notifications",
       label: "Notifications",
       icon: Bell,
       badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
       id: "settings" as const,
+      href: "/dashboard/settings",
       label: "Settings",
       icon: Settings,
     },
   ];
 
   return (
-    <aside className="w-64 shrink-0 hidden lg:flex flex-col justify-between bg-[#14161f] text-gray-300 p-5 rounded-3xl min-h-[calc(100vh-2rem)] sticky top-4 shadow-xl border border-[#232736]">
+    <aside
+      id="desktop-sidebar"
+      className="w-64 shrink-0 hidden lg:flex flex-col justify-between bg-[#14161f] text-gray-300 p-5 rounded-3xl min-h-[calc(100vh-2rem)] sticky top-4 shadow-xl border border-[#232736]"
+    >
       {/* Top Branding & Navigation */}
       <div className="space-y-6">
         {/* SORA Brand Logo */}
@@ -97,15 +111,19 @@ export function Sidebar({
         <nav className="space-y-1.5" aria-label="Dashboard Navigation">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeTab
+              ? activeTab === item.id
+              : item.href === "/dashboard"
+              ? pathname === "/dashboard"
+              : pathname.startsWith(item.href);
 
             return (
-              <button
+              <Link
                 key={item.id}
                 id={`sidebar-tab-${item.id}`}
                 data-tab={item.id}
-                type="button"
-                onClick={() => onTabChange(item.id)}
+                href={item.href}
+                onClick={() => onTabChange?.(item.id)}
                 className={`group w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-display font-semibold transition-all duration-200 active:scale-95 ${
                   isActive
                     ? "bg-[#c8f560] text-[#141413] shadow-[0_4px_20px_rgba(200,245,96,0.3)] font-bold scale-[1.02]"
@@ -132,7 +150,7 @@ export function Sidebar({
                     {item.badge}
                   </span>
                 )}
-              </button>
+              </Link>
             );
           })}
         </nav>

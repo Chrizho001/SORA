@@ -11,6 +11,7 @@
 
 import {
   authClient,
+  refreshAccessToken,
   setStoredAccessToken,
 } from "./axios-client";
 
@@ -147,9 +148,8 @@ export const authApi = {
    * Authenticated via HttpOnly cookie; requires X-Requested-With
    */
   async refreshToken(): Promise<{ access: string }> {
-    const res = await authClient.post<{ access: string }>("/token/refresh/");
-    setStoredAccessToken(res.data.access);
-    return res.data;
+    const access = await refreshAccessToken();
+    return { access };
   },
 
   /**
@@ -171,6 +171,43 @@ export const authApi = {
   async getMe(accessToken?: string): Promise<User> {
     const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
     const res = await authClient.get<User>("/me/", { headers });
+    return res.data;
+  },
+
+  /**
+   * PATCH /api/v1/auth/me/
+   * Status 200 UserSerializer after updating names
+   */
+  async updateProfile(payload: {
+    first_name?: string;
+    last_name?: string;
+  }): Promise<User> {
+    const res = await authClient.patch<User>("/me/", payload);
+    return res.data;
+  },
+
+  /**
+   * POST /api/v1/auth/password/change/
+   * Status 200 with rotated access token
+   */
+  async changePassword(payload: {
+    old_password: string;
+    new_password: string;
+    new_password_confirm: string;
+  }): Promise<{ access: string; detail: string }> {
+    const res = await authClient.post<{ access: string; detail: string }>(
+      "/password/change/",
+      {
+        old_password: payload.old_password,
+        password: payload.new_password,
+        password_confirm: payload.new_password_confirm,
+        new_password: payload.new_password,
+        new_password_confirm: payload.new_password_confirm,
+      }
+    );
+    if (res.data?.access) {
+      setStoredAccessToken(res.data.access);
+    }
     return res.data;
   },
 };

@@ -413,7 +413,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
 
 ## 6. Frontend
 
-- [ ] **FE-01 · P0 · It is not a PWA: there is no manifest, no service worker and no offline shell**
+- [x] **FE-01 · P0 · It is not a PWA: there is no manifest, no service worker and no offline shell**
   - **Where:** `frontend/` (no `app/manifest.ts`, no Serwist in `package.json` or `next.config.ts`).
   - **Problem:** fails SRS §4 "Installability" and success criterion 6. Chrome never fires
     `beforeinstallprompt`, so `PwaInstallCard` always falls back to the manual instructions.
@@ -427,7 +427,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     JSON), and the SW `push` and `notificationclick` handlers are ready for FE-14.
   - **Prompt:** P-10
 
-- [ ] **FE-02 · P0 · Concurrent 401s cause a refresh race that silently kills the session**
+- [x] **FE-02 · P0 · Concurrent 401s cause a refresh race that silently kills the session**
   - **Where:** `frontend/src/lib/axios-client.ts` (401 interceptor); `frontend/src/lib/auth-context.tsx`.
   - **Problem:** each 401 starts its own `/token/refresh/`. The backend rotates and blacklists refresh
     tokens, so the second refresh fails and wipes the fresh token. Every request then fails while the UI
@@ -440,20 +440,20 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - Make the mount-time refresh idempotent under React Strict Mode.
   - **Prompt:** P-09
 
-- [ ] **FE-03 · P0 · The previous user's data survives logout**
+- [x] **FE-03 · P0 · The previous user's data survives logout**
   - **Where:** `frontend/src/lib/auth-context.tsx` `logout()`.
   - **Acceptable solution:** call `queryClient.clear()` on logout and on session expiry, and include
     `user.id` in query keys.
   - **Prompt:** P-09
 
-- [ ] **FE-04 · P0 · Dashboard queries fire before auth resolves, with no loading or error states**
+- [x] **FE-04 · P0 · Dashboard queries fire before auth resolves, with no loading or error states**
   - **Where:** `frontend/src/lib/use-dashboard-queries.ts` (no `enabled: !!user`; one hook hard-codes
     `enabled: true`); `frontend/src/app/dashboard/page.tsx`; the views use `= []` defaults.
   - **Acceptable solution:** gate every query on `!!user && !isAuthLoading`. Each view renders skeleton,
     error (with a Retry button) and empty states distinctly.
   - **Prompt:** P-09
 
-- [ ] **FE-05 · P0 · Flashcards and decks UI: create, edit, delete and browse by deck**
+- [x] **FE-05 · P0 · Flashcards and decks UI: create, edit, delete and browse by deck**
   - **Where:** `frontend/src/components/dashboard/views/FlashcardsView.tsx`, `src/lib/dashboard-api.ts`.
   - **Acceptable solution:**
     - Deck list (title, card count, source document).
@@ -464,20 +464,20 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - "Start quiz" enabled only when the deck has at least 4 distinct answers.
   - **Prompt:** P-12
 
-- [ ] **FE-06 · P1 · Pagination is ignored: lists stop at 20 items**
+- [x] **FE-06 · P1 · Pagination is ignored: lists stop at 20 items**
   - **Where:** every `get*` in `frontend/src/lib/dashboard-api.ts`.
   - **Acceptable solution:** use `useInfiniteQuery` with a "Load more" button, or a helper that follows
     `next` up to a safe cap (e.g. 10 pages). Pass filters (`?deck=`) to the server instead of filtering on
     the client.
   - **Prompt:** P-16
 
-- [ ] **FE-07 · P1 · Flashcards don't appear after AI generation finishes**
+- [x] **FE-07 · P1 · Flashcards don't appear after AI generation finishes**
   - **Where:** `frontend/src/lib/use-dashboard-queries.ts` (`useGenerateFlashcards` invalidates immediately).
   - **Acceptable solution:** while generation is `GENERATING`, poll the document. On the change to
     `DONE`/`FAILED`, invalidate `["flashcards"]`, `["decks"]` and `["notifications"]`.
   - **Prompt:** P-12
 
-- [ ] **FE-08 · P0 · Starting a quiz outside the Quizzes tab loses the session; rejections are unhandled**
+- [x] **FE-08 · P0 · Starting a quiz outside the Quizzes tab loses the session; rejections are unhandled**
   - **Where:** `frontend/src/app/dashboard/page.tsx` (start-quiz handlers), `QuizzesView.tsx` (local
     `activeSession` state), `DocumentsView.tsx` and `ActiveStudyMaterials.tsx` (callers that don't
     `await` or `catch`).
@@ -485,7 +485,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     loads the session by id, and every `mutateAsync` caller has a `try/catch` that shows a toast.
   - **Prompt:** P-11
 
-- [ ] **FE-09 · P0 · Dashboard navigation is local state: no deep links, Back exits the app, and mobile can't reach Quizzes or Notifications**
+- [x] **FE-09 · P0 · Dashboard navigation is local state: no deep links, Back exits the app, and mobile can't reach Quizzes or Notifications**
   - **Where:** `frontend/src/app/dashboard/page.tsx` (tab state), `MobileNav.tsx`.
   - **Acceptable solution:**
     - Real routes: `/dashboard`, `/dashboard/tasks`, `/dashboard/documents`, `/dashboard/flashcards`,
@@ -495,7 +495,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - The mobile nav reaches every section (5 items plus a "More" sheet).
   - **Prompt:** P-11
 
-- [ ] **FE-10 · P0 · Notification type keys don't match the backend**
+- [x] **FE-10 · P0 · Notification type keys don't match the backend**
   - **Where:** `NotificationsView.tsx`, `NotificationDrawer.tsx` (they use `DOCUMENT_SUMMARY_SUCCESS` and
     similar).
   - **Problem:** only `TASK_DUE_SOON` matches, so everything else renders as "System Alert".
@@ -522,7 +522,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `account_conflict` with a clear message.
   - **Prompt:** P-17
 
-- [ ] **FE-13 · P1 · Timezone bugs in task date handling**
+- [x] **FE-13 · P1 · Timezone bugs in task date handling**
   - **Where:** `MiniCalendar.tsx`, `AssignmentsBoard.tsx` and `TasksView.tsx` (`due_at.split("T")[0]`);
     `TaskModal.tsx` (default date from `toISOString()`).
   - **Acceptable solution:** a `src/lib/dates.ts` with `toLocalDateKey(iso)` and `localDayRange(date)`.
@@ -530,7 +530,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     and `to` (or `date` plus `tz`, see BUG-08).
   - **Prompt:** P-14
 
-- [ ] **FE-14 · P0 · Settings is read-only: no profile edit, password change or notification preferences**
+- [x] **FE-14 · P0 · Settings is read-only: no profile edit, password change or notification preferences**
   - **Where:** `SettingsView.tsx`.
   - **Acceptable solution:**
     - A profile form (first and last name) that calls `PATCH /auth/me/`.
@@ -541,7 +541,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     (`PushManager.subscribe` with `NEXT_PUBLIC_VAPID_PUBLIC_KEY`) and POSTs to `/push-subscriptions/`.
   - **Prompt:** P-15
 
-- [ ] **FE-15 · P0 · Tasks can't be edited (SRS §3.2 "Edit task")**
+- [x] **FE-15 · P0 · Tasks can't be edited (SRS §3.2 "Edit task")**
   - **Where:** `TasksView.tsx`, `TaskModal.tsx` (create only).
   - **Acceptable solution:** `TaskModal` accepts an optional `task` and PATCHes it. The edit action is on
     every task row and calendar item.
@@ -552,7 +552,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
   - **Acceptable solution:** a shared confirm dialog naming what will be lost.
   - **Prompt:** P-17
 
-- [ ] **FE-17 · P1 · Quiz UX gaps**
+- [x] **FE-17 · P1 · Quiz UX gaps**
   - **Where:** `QuizzesView.tsx`.
   - **Problem:**
     - Decks or documents that can't be quizzed are offered.
@@ -569,7 +569,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - "Retake mistakes" if P2 time allows.
   - **Prompt:** P-13
 
-- [ ] **FE-18 · P1 · The notification list goes stale while the unread badge updates**
+- [x] **FE-18 · P1 · The notification list goes stale while the unread badge updates**
   - **Where:** `use-dashboard-queries.ts` (only the unread count polls).
   - **Acceptable solution:** when the unread count changes, invalidate `["notifications"]`.
   - **Prompt:** P-16
@@ -580,7 +580,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
   - **Acceptable solution:** one error surface per action, and no auth toast after a voluntary logout.
   - **Prompt:** P-17
 
-- [ ] **FE-20 · P1 · Polling and timeouts**
+- [x] **FE-20 · P1 · Polling and timeouts**
   - **Where:** `use-dashboard-queries.ts` (document polling never stops for a stuck document);
     `axios-client.ts` (15 s upload timeout).
   - **Acceptable solution:** stop polling after 10 minutes per document and show a "Taking longer than
@@ -620,7 +620,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `NUM_PROXIES` set accordingly (SEC-03).
   - **Prompt:** P-18
 
-- [ ] **FE-24 · P2 · Duplicate icon sources**
+- [x] **FE-24 · P2 · Duplicate icon sources**
   - **Where:** `src/app/{favicon.ico,icon.svg,apple-icon.png}` and `public/*`, plus explicit `metadata.icons`.
   - **Acceptable solution:** keep one source, the file-based `app/` icons, and let the manifest reference
     `public/icons/*`.
