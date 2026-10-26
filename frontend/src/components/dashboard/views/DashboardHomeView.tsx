@@ -38,7 +38,7 @@ interface DashboardHomeViewProps {
   onEditTask?: (task: TaskItem) => void;
   onGenerateFlashcards: (docId: string) => void;
   onStartQuiz: (docId: string) => void;
-  onViewDocument: (doc: DocumentItem) => void;
+  onViewDocument: (doc?: DocumentItem) => void;
   onRetryDocument?: (docId: string) => void;
 }
 

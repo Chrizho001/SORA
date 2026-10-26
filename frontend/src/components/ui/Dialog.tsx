@@ -11,6 +11,10 @@ export interface DialogProps {
   children?: React.ReactNode;
   className?: string;
   showCloseButton?: boolean;
+  closeOnBackdropClick?: boolean;
+  variant?: "dialog" | "sheet";
+  headerPrefix?: React.ReactNode;
+  headerSuffix?: React.ReactNode;
 }
 
 export function Dialog({
@@ -21,6 +25,10 @@ export function Dialog({
   children,
   className = "",
   showCloseButton = true,
+  closeOnBackdropClick = true,
+  variant = "dialog",
+  headerPrefix,
+  headerSuffix,
 }: DialogProps) {
   const titleId = useId();
   const descId = useId();
@@ -35,6 +43,16 @@ export function Dialog({
       prevFocusedRef.current.focus();
       prevFocusedRef.current = null;
     }
+  }, [isOpen]);
+
+  // Body scroll lock
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
   }, [isOpen]);
 
   // Handle Escape key and focus trapping
@@ -53,11 +71,11 @@ export function Dialog({
         if (!dialogNode) return;
 
         const focusableSelectors = [
-          'a[href]',
-          'button:not([disabled])',
-          'textarea:not([disabled])',
-          'input:not([disabled])',
-          'select:not([disabled])',
+          "a[href]",
+          "button:not([disabled])",
+          "textarea:not([disabled])",
+          "input:not([disabled])",
+          "select:not([disabled])",
           '[tabindex]:not([tabindex="-1"])',
         ].join(", ");
 
@@ -94,23 +112,23 @@ export function Dialog({
 
     window.addEventListener("keydown", handleKeyDown);
 
-    // Initial focus: first focusable element or dialog container
+    // Initial focus: first input or close button
     const timer = setTimeout(() => {
       const dialogNode = dialogRef.current;
       if (!dialogNode) return;
 
-      const firstInputOrButton = dialogNode.querySelector<HTMLElement>(
-        'input:not([disabled]), textarea:not([disabled]), button:not([disabled]):not([aria-label="Close dialog"])'
+      const firstInput = dialogNode.querySelector<HTMLElement>(
+        'input:not([disabled]), textarea:not([disabled]), select:not([disabled])'
       );
 
-      if (firstInputOrButton) {
-        firstInputOrButton.focus();
+      if (firstInput) {
+        firstInput.focus();
       } else {
-        const anyFocusable = dialogNode.querySelector<HTMLElement>(
-          'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        const closeBtnOrAny = dialogNode.querySelector<HTMLElement>(
+          'button[aria-label="Close"], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
         );
-        if (anyFocusable) {
-          anyFocusable.focus();
+        if (closeBtnOrAny) {
+          closeBtnOrAny.focus();
         } else {
           dialogNode.focus();
         }
@@ -125,11 +143,17 @@ export function Dialog({
 
   if (!isOpen) return null;
 
+  const isSheet = variant === "sheet";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className={
+        isSheet
+          ? "fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          : "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      }
       onClick={(e) => {
-        if (e.target === e.currentTarget) {
+        if (closeOnBackdropClick && e.target === e.currentTarget) {
           onClose();
         }
       }}
@@ -141,32 +165,42 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
-        className={`relative w-full max-w-lg rounded-3xl bg-surface border border-line p-6 shadow-2xl text-ink focus:outline-none animate-in zoom-in-95 duration-150 ${className}`}
+        className={
+          isSheet
+            ? `relative w-full max-w-md h-full bg-surface border-l border-line p-6 shadow-2xl text-ink focus:outline-none flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-300 ${className}`
+            : `relative w-full max-w-lg rounded-3xl bg-surface border border-line p-6 shadow-2xl text-ink focus:outline-none animate-in zoom-in-95 duration-150 ${className}`
+        }
       >
-        <div className="flex items-start justify-between gap-4 pb-3 border-b border-line mb-4">
-          <div className="min-w-0 pr-2">
-            <h2 id={titleId} className="font-display font-bold text-lg text-ink tracking-tight">
-              {title}
-            </h2>
-            {description && (
-              <p id={descId} className="text-xs text-muted font-body mt-0.5">
-                {description}
-              </p>
+        <div className="flex items-start justify-between gap-4 pb-3 border-b border-line mb-4 shrink-0">
+          <div className="flex items-center gap-3 min-w-0 pr-2">
+            {headerPrefix}
+            <div className="min-w-0">
+              <h2 id={titleId} className="font-display font-bold text-lg text-ink tracking-tight truncate">
+                {title}
+              </h2>
+              {description && (
+                <p id={descId} className="text-xs text-muted font-body mt-0.5">
+                  {description}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {headerSuffix}
+            {showCloseButton && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="size-8 rounded-full text-muted hover:bg-mist hover:text-ink flex items-center justify-center transition-colors shrink-0"
+              >
+                <X className="size-4" />
+              </button>
             )}
           </div>
-          {showCloseButton && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close dialog"
-              className="size-8 rounded-full text-muted hover:bg-mist hover:text-ink flex items-center justify-center transition-colors shrink-0"
-            >
-              <X className="size-4" />
-            </button>
-          )}
         </div>
 
-        <div>{children}</div>
+        <div className={isSheet ? "flex-1 flex flex-col min-h-0" : ""}>{children}</div>
       </div>
     </div>
   );

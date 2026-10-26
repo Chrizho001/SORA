@@ -4,7 +4,6 @@ import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  X,
   Bell,
   CheckCheck,
   Check,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 import { NotificationItem } from "@/lib/dashboard-api";
 import { getNotificationConfig } from "@/lib/notification-types";
+import { Dialog } from "@/components/ui/Dialog";
 
 interface NotificationDrawerProps {
   isOpen: boolean;
@@ -30,8 +30,6 @@ export function NotificationDrawer({
 }: NotificationDrawerProps) {
   const router = useRouter();
 
-  if (!isOpen) return null;
-
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
   const handleNotificationClick = (notif: NotificationItem) => {
@@ -46,51 +44,39 @@ export function NotificationDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-md h-full bg-surface border-l border-line p-6 shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-300">
-        {/* Top Header */}
-        <div>
-          <div className="flex items-center justify-between pb-4 border-b border-line">
-            <div className="flex items-center gap-2.5">
-              <div className="size-9 rounded-2xl bg-[#c8f560] text-[#141413] flex items-center justify-center font-bold">
-                <Bell className="size-4" />
-              </div>
-              <div>
-                <h3 className="font-display font-bold text-base text-ink">Notifications</h3>
-                <p className="text-xs text-muted font-body">
-                  {unreadCount > 0
-                    ? `${unreadCount} unread update${unreadCount > 1 ? "s" : ""}`
-                    : "All updates are read"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {unreadCount > 0 && (
-                <button
-                  type="button"
-                  onClick={onMarkAllRead}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-canvas hover:bg-mist text-[0.6875rem] font-display font-semibold text-ink border border-line transition-colors"
-                  title="Mark all as read"
-                >
-                  <CheckCheck className="size-3 text-emerald-600" />
-                  <span>Mark All Read</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="size-8 rounded-full text-muted hover:bg-mist hover:text-ink flex items-center justify-center transition-colors"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      variant="sheet"
+      title="Notifications"
+      description={
+        unreadCount > 0
+          ? `${unreadCount} unread update${unreadCount > 1 ? "s" : ""}`
+          : "All updates are read"
+      }
+      headerPrefix={
+        <div className="size-9 rounded-2xl bg-[#c8f560] text-[#141413] flex items-center justify-center font-bold shrink-0">
+          <Bell className="size-4" />
         </div>
-
+      }
+      headerSuffix={
+        unreadCount > 0 ? (
+          <button
+            type="button"
+            onClick={onMarkAllRead}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-canvas hover:bg-mist text-[0.6875rem] font-display font-semibold text-ink border border-line transition-colors"
+            title="Mark all as read"
+            aria-label="Mark all notifications as read"
+          >
+            <CheckCheck className="size-3 text-emerald-600" />
+            <span>Mark All Read</span>
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="flex-1 flex flex-col justify-between overflow-hidden">
         {/* Notifications List */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-2.5 pr-1">
+        <div className="flex-1 overflow-y-auto py-2 space-y-2.5 pr-1">
           {notifications.length === 0 ? (
             <div className="py-16 text-center space-y-2">
               <div className="size-12 rounded-2xl bg-canvas mx-auto flex items-center justify-center text-subtle">
@@ -137,6 +123,7 @@ export function NotificationDrawer({
                           }}
                           className="size-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 transition-colors"
                           title="Mark read"
+                          aria-label="Mark notification as read"
                         >
                           <Check className="size-3" />
                         </button>
@@ -165,7 +152,7 @@ export function NotificationDrawer({
         </div>
 
         {/* Footer */}
-        <div className="pt-3 border-t border-line text-xs font-body text-muted flex items-center justify-between">
+        <div className="pt-3 border-t border-line text-xs font-body text-muted flex items-center justify-between shrink-0">
           <Link
             href="/dashboard/notifications"
             onClick={onClose}
@@ -179,6 +166,6 @@ export function NotificationDrawer({
           </span>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

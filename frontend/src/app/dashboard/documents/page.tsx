@@ -32,12 +32,7 @@ export default function DocumentsPage() {
     file: File,
     onProgress?: (percent: number) => void
   ) => {
-    try {
-      return await uploadDocMutation.mutateAsync({ file, onProgress });
-    } catch (err: unknown) {
-      notify.error(formatApiErrorMessage(err), "Failed to Upload Document");
-      throw err;
-    }
+    return await uploadDocMutation.mutateAsync({ file, onProgress });
   };
 
   const handleGenerateFlashcards = async (docId: string) => {

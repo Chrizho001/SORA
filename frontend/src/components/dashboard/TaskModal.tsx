@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Calendar as CalendarIcon, Clock, AlertTriangle, Check, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, AlertTriangle, Check, Pencil } from "lucide-react";
 import { CreateTaskPayload, TaskItem } from "@/lib/dashboard-api";
 import { SoraMascot } from "@/components/auth/SoraMascot";
 import { formatApiErrorMessage } from "@/lib/axios-client";
 import { toLocalInputs, fromLocalInput, toLocalDateKey } from "@/lib/dates";
+import { Dialog } from "@/components/ui/Dialog";
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface TaskModalProps {
 }
 
 function TaskModalDialog({
+  isOpen,
   onClose,
   onSubmit,
   onUpdate,
@@ -98,36 +100,23 @@ function TaskModalDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-3xl bg-surface border border-line p-6 shadow-2xl text-ink space-y-5 max-h-[90vh] overflow-y-auto">
-        {/* Modal Header */}
-        <div className="flex items-start justify-between pb-3 border-b border-line">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-2xl bg-[#c8f560] text-[#141413] flex items-center justify-center font-bold">
-              {isEditMode ? <Pencil className="size-5" /> : <CalendarIcon className="size-5" />}
-            </div>
-            <div>
-              <h3 className="font-display font-bold text-lg text-ink">
-                {isEditMode ? "Edit task" : "Schedule Study Task"}
-              </h3>
-              <p className="text-xs text-muted font-body">
-                {isEditMode
-                  ? "Update task details, deadline, or priority"
-                  : "Add an assignment deadline, quiz review, or study session"}
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="size-8 rounded-full text-muted hover:bg-mist hover:text-ink flex items-center justify-center transition-colors"
-            aria-label="Close modal"
-          >
-            <X className="size-4" />
-          </button>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditMode ? "Edit task" : "Schedule Study Task"}
+      description={
+        isEditMode
+          ? "Update task details, deadline, or priority"
+          : "Add an assignment deadline, quiz review, or study session"
+      }
+      headerPrefix={
+        <div className="size-10 rounded-2xl bg-[#c8f560] text-[#141413] flex items-center justify-center font-bold shrink-0">
+          {isEditMode ? <Pencil className="size-5" /> : <CalendarIcon className="size-5" />}
         </div>
-
+      }
+      className="max-h-[90vh] overflow-y-auto"
+    >
+      <div className="space-y-5">
         {/* Mascot Mini Helper */}
         <div className="flex items-center gap-3 p-3 rounded-2xl bg-canvas border border-line">
           <SoraMascot
@@ -288,7 +277,7 @@ function TaskModalDialog({
           </div>
         </form>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

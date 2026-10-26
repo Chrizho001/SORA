@@ -15,6 +15,7 @@ import { TaskItem } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
 import { MiniCalendar } from "../MiniCalendar";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { toLocalDateKey, isOverdue, isDueSoon } from "@/lib/dates";
 
 interface TasksViewProps {
@@ -41,6 +42,7 @@ export function TasksView({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<number | null>(null);
   const [onlyNoDeadline, setOnlyNoDeadline] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<TaskItem | null>(null);
 
   if (isLoading) {
     return (
@@ -272,7 +274,7 @@ export function TasksView({
                       key={task.id}
                       task={task}
                       onToggleTask={onToggleTask}
-                      onDeleteTask={onDeleteTask}
+                      onDeleteTask={(t) => setTaskToDelete(t)}
                       onEditTask={onEditTask}
                     />
                   ))}
@@ -295,7 +297,7 @@ export function TasksView({
                         key={task.id}
                         task={task}
                         onToggleTask={onToggleTask}
-                        onDeleteTask={onDeleteTask}
+                        onDeleteTask={(t) => setTaskToDelete(t)}
                         onEditTask={onEditTask}
                       />
                     ))}
@@ -306,6 +308,21 @@ export function TasksView({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(taskToDelete)}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={() => {
+          if (taskToDelete) {
+            onDeleteTask(taskToDelete.id);
+            setTaskToDelete(null);
+          }
+        }}
+        title="Delete Task"
+        description="Deletes this task permanently."
+        confirmLabel="Delete"
+        tone="danger"
+      />
     </div>
   );
 }
@@ -318,7 +335,7 @@ function TaskItemRow({
 }: {
   task: TaskItem;
   onToggleTask: (task: TaskItem) => void;
-  onDeleteTask: (id: string) => void;
+  onDeleteTask: (task: TaskItem) => void;
   onEditTask?: (task: TaskItem) => void;
 }) {
   const overdue = !task.is_completed && isOverdue(task.due_at);
@@ -424,7 +441,7 @@ function TaskItemRow({
 
         <button
           type="button"
-          onClick={() => onDeleteTask(task.id)}
+          onClick={() => onDeleteTask(task)}
           aria-label={`Delete task ${task.title}`}
           className="p-1.5 rounded-xl text-subtle hover:text-rose-600 hover:bg-rose-50 transition-colors"
           title="Delete task"

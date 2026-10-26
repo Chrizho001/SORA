@@ -10,7 +10,6 @@ import {
   BookOpen,
   Trash2,
   AlertCircle,
-  X,
   UploadCloud,
   CheckCircle2,
   RotateCw,
@@ -20,6 +19,8 @@ import { DocumentItem, Deck } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
 import { FormattedSummary, stripMarkdown } from "../FormattedSummary";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Dialog } from "@/components/ui/Dialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface DocumentsViewProps {
   documents?: DocumentItem[];
@@ -47,6 +48,7 @@ export function DocumentsView({
   onRetryDocument,
 }: DocumentsViewProps) {
   const [selectedSummaryDoc, setSelectedSummaryDoc] = useState<DocumentItem | null>(null);
+  const [docToDelete, setDocToDelete] = useState<DocumentItem | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
 
   useEffect(() => {
@@ -266,9 +268,10 @@ export function DocumentsView({
 
                       <button
                         type="button"
-                        onClick={() => onDeleteDocument(doc.id)}
+                        onClick={() => setDocToDelete(doc)}
                         className="p-1 rounded-lg text-subtle hover:text-rose-600 hover:bg-rose-50 transition-colors ml-1"
                         title="Delete document"
+                        aria-label={`Delete ${doc.original_name}`}
                       >
                         <Trash2 className="size-4" />
                       </button>
@@ -348,8 +351,9 @@ export function DocumentsView({
                   {isFailed && (
                     <button
                       type="button"
-                      onClick={() => onDeleteDocument(doc.id)}
+                      onClick={() => setDocToDelete(doc)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-display font-semibold border border-rose-200 transition-all hover:scale-105 active:scale-95"
+                      aria-label={`Remove ${doc.original_name}`}
                     >
                       <Trash2 className="size-3.5 text-rose-600" />
                       <span>Remove</span>
@@ -419,61 +423,66 @@ export function DocumentsView({
       )}
 
       {/* Summary Reader Modal */}
-      {selectedSummaryDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl rounded-3xl bg-surface border border-line p-6 shadow-2xl text-ink space-y-4 max-h-[85vh] flex flex-col justify-between">
-            <div className="flex items-start justify-between pb-3 border-b border-line">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="size-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-                  <BookOpen className="size-5" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-display font-bold text-base text-ink truncate">
-                    {selectedSummaryDoc.original_name}
-                  </h3>
-                  <p className="text-xs text-muted font-body">
-                    AI Summary • {selectedSummaryDoc.summary?.ai_model_used || "SORA AI Engine"}
-                  </p>
-                </div>
+      <Dialog
+        isOpen={Boolean(selectedSummaryDoc)}
+        onClose={() => setSelectedSummaryDoc(null)}
+        title={selectedSummaryDoc?.original_name || "Document Summary"}
+        description={
+          selectedSummaryDoc
+            ? `AI Summary • ${selectedSummaryDoc.summary?.ai_model_used || "SORA AI Engine"}`
+            : undefined
+        }
+        headerPrefix={
+          <div className="size-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+            <BookOpen className="size-5" />
+          </div>
+        }
+        className="max-w-2xl max-h-[85vh] flex flex-col justify-between"
+      >
+        <div className="space-y-4">
+          <div className="overflow-y-auto pr-2 max-h-[55vh]">
+            {selectedSummaryDoc?.summary?.content ? (
+              <FormattedSummary content={selectedSummaryDoc.summary.content} />
+            ) : (
+              <div className="p-8 text-center text-muted space-y-2">
+                <AlertCircle className="size-8 text-amber-500 mx-auto" />
+                <p className="font-display font-semibold text-ink">Summary Not Available</p>
+                <p className="text-xs">This document does not have a generated summary yet.</p>
               </div>
+            )}
+          </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedSummaryDoc(null)}
-                className="size-8 rounded-full text-muted hover:bg-mist hover:text-ink flex items-center justify-center transition-colors shrink-0"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto pr-2 max-h-[60vh]">
-              {selectedSummaryDoc.summary?.content ? (
-                <FormattedSummary content={selectedSummaryDoc.summary.content} />
-              ) : (
-                <div className="p-8 text-center text-muted space-y-2">
-                  <AlertCircle className="size-8 text-amber-500 mx-auto" />
-                  <p className="font-display font-semibold text-ink">Summary Not Available</p>
-                  <p className="text-xs">This document does not have a generated summary yet.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-line flex items-center justify-between">
-              <span className="text-[0.6875rem] text-muted font-body flex items-center gap-1">
-                <Sparkles className="size-3 text-amber-500" />
-                <span>Multimodal AI Academic Analysis</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedSummaryDoc(null)}
-                className="px-4 py-2 rounded-xl bg-night text-[#c8f560] text-xs font-display font-bold hover:bg-ink transition-transform active:scale-95"
-              >
-                Done Reading
-              </button>
-            </div>
+          <div className="pt-3 border-t border-line flex items-center justify-between">
+            <span className="text-[0.6875rem] text-muted font-body flex items-center gap-1">
+              <Sparkles className="size-3 text-amber-500" />
+              <span>Multimodal AI Academic Analysis</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedSummaryDoc(null)}
+              className="px-4 py-2 rounded-xl bg-night text-[#c8f560] text-xs font-display font-bold hover:bg-ink transition-transform active:scale-95"
+            >
+              Done Reading
+            </button>
           </div>
         </div>
-      )}
+      </Dialog>
+
+      {/* Delete Document Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(docToDelete)}
+        onClose={() => setDocToDelete(null)}
+        onConfirm={() => {
+          if (docToDelete) {
+            onDeleteDocument(docToDelete.id);
+            setDocToDelete(null);
+          }
+        }}
+        title="Delete Document"
+        description="Deletes the PDF and its summary. Decks made from it are kept."
+        confirmLabel="Delete"
+        tone="danger"
+      />
     </div>
   );
 }

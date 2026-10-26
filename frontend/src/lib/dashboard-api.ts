@@ -288,9 +288,6 @@ export const flashcardsApi = {
     const params = typeof filter === "string" ? { document: filter } : filter;
     return this.list(params);
   },
-  getCardsByDeck(deckId: string) {
-    return this.list({ deck: deckId });
-  },
   updateFlashcard(id: string, payload: Partial<Flashcard>) {
     return this.update(id, payload);
   },

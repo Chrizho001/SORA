@@ -16,9 +16,21 @@ import { useAuth } from "@/lib/auth-context";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const expired = searchParams.get("expired");
-  const { login } = useAuth();
+  const expired = searchParams?.get("expired");
+  const { user, isLoading, login } = useAuth();
   const [isPending, startTransition] = useTransition();
+
+  // Redirect logged-in users away to /dashboard
+  useEffect(() => {
+    if (!isLoading && user) {
+      const rawNext = searchParams?.get("next");
+      const targetUrl =
+        rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("\\")
+          ? rawNext
+          : "/dashboard";
+      router.replace(targetUrl);
+    }
+  }, [user, isLoading, router, searchParams]);
 
   // Show expired toast on mount if ?expired=1
   useEffect(() => {
@@ -31,7 +43,6 @@ function LoginForm() {
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
-    remember_me: false,
   });
 
   // Validation Errors
@@ -264,18 +275,8 @@ function LoginForm() {
             placeholder="••••••••"
           />
 
-          {/* Remember Me & Forgot Password Row */}
-          <div className="flex items-center justify-between pt-1 pb-2">
-            <label className="flex items-center gap-2 cursor-pointer select-none text-xs sm:text-sm text-muted hover:text-ink transition-colors">
-              <input
-                type="checkbox"
-                checked={formData.remember_me}
-                onChange={(e) => handleChange("remember_me", e.target.checked)}
-                className="size-4 rounded border-line text-night focus:ring-night/20 accent-night"
-              />
-              <span>Remember me</span>
-            </label>
-
+          {/* Forgot Password Row */}
+          <div className="flex items-center justify-end pt-1 pb-2">
             <Link
               href="/forgot-password"
               className="text-xs sm:text-sm font-medium font-display text-muted hover:text-ink underline-offset-4 hover:underline transition-colors"

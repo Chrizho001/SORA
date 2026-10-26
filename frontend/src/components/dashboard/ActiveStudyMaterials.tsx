@@ -18,7 +18,7 @@ interface ActiveStudyMaterialsProps {
   onUploadClick: () => void;
   onGenerateFlashcards: (docId: string) => void;
   onStartQuiz: (docId: string) => void;
-  onViewDocument: (doc: DocumentItem) => void;
+  onViewDocument: (doc?: DocumentItem) => void;
   onRetryDocument?: (docId: string) => void;
   className?: string;
 }
@@ -266,7 +266,7 @@ export function ActiveStudyMaterials({
         </span>
         <button
           type="button"
-          onClick={() => onViewDocument(documents[0] || ({} as DocumentItem))}
+          onClick={() => onViewDocument(documents[0])}
           className="font-display font-semibold text-ink hover:underline text-[0.6875rem]"
         >
           View Library →
