@@ -334,7 +334,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - The old `/documents/{id}/start-quiz/` is removed.
   - **Prompt:** P-05
 
-- [ ] **FEAT-03 · P0 · Profile update `PATCH /api/v1/auth/me/` (SRS §3.1)**
+- [x] **FEAT-03 · P0 · Profile update `PATCH /api/v1/auth/me/` (SRS §3.1)**
   - **Where:** `backend/apps/accounts/views.py` `MeAPIView` (GET only today).
   - **Acceptable solution:** PATCH accepts `first_name` and `last_name`; other fields are read-only and
     ignored. Returns 200 with the `UserSerializer` payload. Implements `architecture/01-authentication.md`
@@ -343,7 +343,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
 
 ## 4. Backend — Performance
 
-- [ ] **PERF-01 · P0 · The documents list makes one summary query per row and ships huge payloads**
+- [x] **PERF-01 · P0 · The documents list makes one summary query per row and ships huge payloads**
   - **Where:** `backend/apps/documents/views.py` `get_queryset`, `serializers.py`.
   - **Acceptable solution:** `.select_related("summary").defer("extracted_text")` for list, plus a
     `DocumentListSerializer` without `summary.content`. The detail view keeps the full summary. Add a
@@ -356,12 +356,12 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `prefetch_related("questions")`. Add a query-count test.
   - **Prompt:** P-05
 
-- [ ] **PERF-03 · P1 · Indexes don't match the list orderings**
+- [x] **PERF-03 · P1 · Indexes don't match the list orderings**
   - **Acceptable solution:** add indexes `QuizSession(user, -created_at)`, `Notification(recipient, -created_at)`,
     `Deck(user, -updated_at)` and `Flashcard(user, deck)`, with migrations.
   - **Prompt:** P-07
 
-- [ ] **PERF-04 · P2 · Gemini receives the whole PDF as base64 even when text was extracted**
+- [x] **PERF-04 · P2 · Gemini receives the whole PDF as base64 even when text was extracted**
   - **Where:** `backend/apps/documents/ai.py` `GeminiSummarizerClient.summarize`.
   - **Acceptable solution:** send `pdf_bytes` only when `text` is empty (the scanned-PDF path).
   - **Prompt:** P-07

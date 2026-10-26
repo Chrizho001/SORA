@@ -398,8 +398,8 @@ Files: `apps/accounts/tests/`. Fixtures in `backend/conftest.py`: `api_client`, 
 ### Group 8 — Profile (`test_api_me.py`)
 - [x] unauthenticated GET → 401
 - [x] GET → 200 `UserSerializer` for the requesting user
-- [ ] PATCH names → 200, persisted *(was ticked but not implemented on `main` — re-opened 2026-10-25, Code_Review FEAT-03)*
-- [ ] PATCH `email` / `is_email_verified` → ignored (unchanged in the DB) *(re-opened, FEAT-03)*
+- [x] PATCH names → 200, persisted *(was ticked but not implemented on `main` — re-opened 2026-10-25, Code_Review FEAT-03)*
+- [x] PATCH `email` / `is_email_verified` → ignored (unchanged in the DB) *(re-opened, FEAT-03)*
 - [x] an expired access token (freezegun, > 15 min) → 401
 
 ### Group 9 — Password change (`test_api_password_change.py`)

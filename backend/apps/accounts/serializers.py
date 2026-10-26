@@ -86,11 +86,13 @@ class RegisterSerializer(serializers.Serializer):
 
 class VerifyEmailSerializer(serializers.Serializer):
     """Serializer for POST /api/v1/auth/verify-email/."""
+
     token = serializers.CharField()
 
 
 class VerifyEmailResendSerializer(serializers.Serializer):
     """Serializer for POST /api/v1/auth/verify-email/resend/."""
+
     email = serializers.EmailField()
 
 
@@ -99,12 +101,14 @@ class LoginSerializer(serializers.Serializer):
     Serializer for POST /api/v1/auth/login/.
     Only validates that fields are present. View handles authentication.
     """
+
     email = serializers.CharField()
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
 
 class ChangePasswordSerializer(serializers.Serializer):
     """Serializer for POST /api/v1/auth/password/change/."""
+
     old_password = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
     password_confirm = serializers.CharField(write_only=True, style={"input_type": "password"})
@@ -133,16 +137,19 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class GoogleLoginSerializer(serializers.Serializer):
     """Serializer for POST /api/v1/auth/google/."""
+
     token = serializers.CharField()
 
 
 class PasswordResetSerializer(serializers.Serializer):
     """Serializer for POST /api/v1/auth/password-reset/."""
+
     email = serializers.EmailField()
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     """Serializer for POST /api/v1/auth/password-reset/confirm/."""
+
     uid = serializers.CharField()
     token = serializers.CharField()
     new_password = serializers.CharField(write_only=True, style={"input_type": "password"})
@@ -158,9 +165,29 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if password:
             from django.contrib.auth.password_validation import validate_password
             from django.core.exceptions import ValidationError as DjangoValidationError
+
             try:
                 validate_password(password)
             except DjangoValidationError as e:
                 raise serializers.ValidationError({"new_password": list(e.messages)})
 
         return attrs
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating user profile (PATCH /api/v1/auth/me/).
+    Fields first_name and last_name, max 150, trimmed.
+    Every other field is read-only and ignored.
+    """
+
+    first_name = serializers.CharField(
+        max_length=150, required=False, allow_blank=False, trim_whitespace=True
+    )
+    last_name = serializers.CharField(
+        max_length=150, required=False, allow_blank=True, trim_whitespace=True
+    )
+
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name")

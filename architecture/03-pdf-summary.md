@@ -104,7 +104,7 @@ Response: 204 No Content
 - [x] Retry: FAILED → 202; DONE → 400 `document_not_retryable`; fresh PROCESSING → 409; stale PROCESSING → 202
 - [ ] An exception containing `SECRET-INTERNAL` never appears in `error_message` or the notification
 - [x] Empty file → 400 `file_empty`; Content-Length > 12 MB → 413
-- [ ] List endpoint: constant query count for 1 vs 5 documents; no `summary.content` in list items
+- [x] List endpoint: constant query count for 1 vs 5 documents; no `summary.content` in list items
 - [x] PATCH → 405
 - [ ] AI clients: success, 401/403, 429, 503-then-success retry, timeout and invalid JSON (patched `requests.post`)
 

@@ -107,6 +107,62 @@ class TestDocumentAPI:
         assert "test1.pdf" in names
         assert "test2.pdf" in names
 
+    def test_list_documents_constant_queries_and_no_summary_content(
+        self, auth_client, user, django_assert_num_queries
+    ):
+        doc1 = Document.objects.create(
+            user=user,
+            original_name="doc1.pdf",
+            size=100,
+            status=Document.Status.DONE,
+            extracted_text="Lots of extracted text...",
+        )
+        Summary.objects.create(document=doc1, content="Summary 1", ai_model_used="gemini")
+
+        # 1 document: 1 auth user, 1 count, 1 list (with select_related)
+        with django_assert_num_queries(3):
+            res1 = auth_client.get(self.url)
+        assert res1.status_code == status.HTTP_200_OK
+        assert res1.data["count"] == 1
+        item1 = res1.data["results"][0]
+        assert "summary" not in item1
+        assert item1["has_summary"] is True
+        expected_fields = {
+            "id",
+            "original_name",
+            "size",
+            "page_count",
+            "status",
+            "error_message",
+            "flashcard_generation_status",
+            "has_summary",
+            "created_at",
+        }
+        assert set(item1.keys()) == expected_fields
+
+        # Create 4 more documents (some with summary, some without)
+        for i in range(2, 6):
+            doc = Document.objects.create(
+                user=user,
+                original_name=f"doc{i}.pdf",
+                size=200,
+                status=Document.Status.DONE,
+                extracted_text="More extracted text...",
+            )
+            if i % 2 == 0:
+                Summary.objects.create(
+                    document=doc, content=f"Summary {i}", ai_model_used="gemini"
+                )
+
+        # 5 documents: query count must be identical (3: 1 auth, 1 count, 1 list)
+        with django_assert_num_queries(3):
+            res5 = auth_client.get(self.url)
+        assert res5.status_code == status.HTTP_200_OK
+        assert res5.data["count"] == 5
+        for item in res5.data["results"]:
+            assert "summary" not in item
+            assert set(item.keys()) == expected_fields
+
     def test_retrieve_document_with_summary(self, auth_client, user):
         doc = Document.objects.create(
             user=user, original_name="test.pdf", size=100, status=Document.Status.DONE

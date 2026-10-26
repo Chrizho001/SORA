@@ -1,3 +1,4 @@
+import base64
 import logging
 import time
 
@@ -144,26 +145,21 @@ class GeminiSummarizerClient:
         )
 
         parts = []
-        if pdf_bytes:
-            import base64
-
-            b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
-            parts.append({"inline_data": {"mime_type": "application/pdf", "data": b64_pdf}})
-            prompt_text = prompt_instruction
-            if text and text.strip():
-                prompt_text += f"\n\nExtracted text reference:\n{text[:30000]}"
-            parts.append({"text": prompt_text})
-        else:
-            if not text or not text.strip():
-                logger.error("No text or PDF content provided for summarization.")
-                raise DocumentProcessingError(
-                    "No text could be extracted from this PDF, and visual analysis "
-                    "could not read it. Please ensure the PDF is clear and readable."
-                )
+        if text and text.strip():
             max_chars = getattr(settings, "AI_MAX_PROMPT_CHARS", 500000)
             if len(text) > max_chars:
                 text = text[:max_chars] + "\n\n[Note: Document excerpted to fit token limits.]"
             parts.append({"text": f"{prompt_instruction}\n\n{text}"})
+        elif pdf_bytes:
+            b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
+            parts.append({"inline_data": {"mime_type": "application/pdf", "data": b64_pdf}})
+            parts.append({"text": prompt_instruction})
+        else:
+            logger.error("No text or PDF content provided for summarization.")
+            raise DocumentProcessingError(
+                "No text could be extracted from this PDF, and visual analysis "
+                "could not read it. Please ensure the PDF is clear and readable."
+            )
 
         payload = {"contents": [{"parts": parts}]}
         headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}

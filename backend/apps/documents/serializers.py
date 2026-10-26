@@ -39,6 +39,33 @@ class DocumentSerializer(serializers.ModelSerializer):
         ]
 
 
+class DocumentListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for listing documents (GET /api/v1/documents/).
+    Omits heavy summary content and extracted text.
+    """
+
+    has_summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = [
+            "id",
+            "original_name",
+            "size",
+            "page_count",
+            "status",
+            "error_message",
+            "flashcard_generation_status",
+            "has_summary",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_has_summary(self, obj) -> bool:
+        return hasattr(obj, "summary")
+
+
 class DocumentUploadSerializer(serializers.ModelSerializer):
     file = serializers.FileField(write_only=True, allow_empty_file=True)
 

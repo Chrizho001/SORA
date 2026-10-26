@@ -108,3 +108,46 @@ def test_summarizer_client_with_api_key_success(monkeypatch):
     client = SummarizerClient(api_key="valid-key")
     result = client.summarize("Some document text.")
     assert result == "Generated OpenAI summary."
+
+
+def test_gemini_summarizer_inline_pdf_only_when_text_empty():
+    from unittest.mock import MagicMock, patch
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    client = GeminiSummarizerClient(api_key="fake-gemini-key")
+    dummy_pdf = b"%PDF-1.4 dummy content"
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "candidates": [{"content": {"parts": [{"text": "Gemini summary text"}]}}]
+    }
+
+    # Case 1: When text is provided (non-empty), payload has NO inline_data
+    with patch("apps.documents.ai.requests.post", return_value=mock_resp) as mock_post:
+        res = client.summarize(text="Digital text extracted from PDF", pdf_bytes=dummy_pdf)
+        assert res == "Gemini summary text"
+        mock_post.assert_called_once()
+        sent_payload = mock_post.call_args.kwargs["json"]
+        parts = sent_payload["contents"][0]["parts"]
+        assert not any("inline_data" in part for part in parts)
+        assert any("Digital text extracted from PDF" in part.get("text", "") for part in parts)
+
+    # Case 2: When text is "" (empty), payload HAS inline_data
+    with patch("apps.documents.ai.requests.post", return_value=mock_resp) as mock_post:
+        res = client.summarize(text="", pdf_bytes=dummy_pdf)
+        assert res == "Gemini summary text"
+        mock_post.assert_called_once()
+        sent_payload = mock_post.call_args.kwargs["json"]
+        parts = sent_payload["contents"][0]["parts"]
+        assert any("inline_data" in part for part in parts)
+
+    # Case 3: When text is whitespace only, payload HAS inline_data
+    with patch("apps.documents.ai.requests.post", return_value=mock_resp) as mock_post:
+        res = client.summarize(text="   \n \t  ", pdf_bytes=dummy_pdf)
+        assert res == "Gemini summary text"
+        mock_post.assert_called_once()
+        sent_payload = mock_post.call_args.kwargs["json"]
+        parts = sent_payload["contents"][0]["parts"]
+        assert any("inline_data" in part for part in parts)

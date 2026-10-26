@@ -336,6 +336,21 @@ class MeAPIView(APIView):
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def patch(self, request, *args, **kwargs):
+        from .serializers import UserSerializer, UserUpdateSerializer
+
+        user = request.user
+        if not user.is_active:
+            from rest_framework.exceptions import AuthenticationFailed
+
+            raise AuthenticationFailed("User is inactive", code="user_inactive")
+
+        serializer = UserUpdateSerializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated_user = serializer.save()
+
+        return Response(UserSerializer(updated_user).data, status=status.HTTP_200_OK)
+
 
 class ChangePasswordAPIView(APIView):
     """

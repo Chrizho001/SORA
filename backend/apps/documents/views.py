@@ -4,7 +4,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.documents.models import Document
-from apps.documents.serializers import DocumentSerializer, DocumentUploadSerializer
+from apps.documents.serializers import (
+    DocumentListSerializer,
+    DocumentSerializer,
+    DocumentUploadSerializer,
+)
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -12,11 +16,16 @@ class DocumentViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_queryset(self):
-        return Document.objects.filter(user=self.request.user)
+        qs = Document.objects.filter(user=self.request.user)
+        if getattr(self, "action", None) == "list":
+            return qs.select_related("summary").defer("extracted_text")
+        return qs
 
     def get_serializer_class(self):
         if self.action == "create":
             return DocumentUploadSerializer
+        if self.action == "list":
+            return DocumentListSerializer
         return DocumentSerializer
 
     def get_throttles(self):
