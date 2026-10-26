@@ -1,0 +1,107 @@
+{% extends "admin/base.html" %}
+{% load i18n unfold %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-8">
+
+    {# ── Heading ─────────────────────────────────────────── #}
+    <div class="flex flex-col gap-2 lg:flex-row lg:items-center justify-between">
+        <div>
+            <p class="sora-eyebrow text-subtle mb-2"><span class="sora-dot"></span>&nbsp; Live overview</p>
+            <h1 class="font-semibold text-3xl tracking-tight text-important leading-none">
+                Good to see you{% if request.user.first_name %}, {{ request.user.first_name }}{% endif %}.
+            </h1>
+            <p class="text-subtle mt-2 text-sm">How students are using SORA right now.</p>
+        </div>
+        <div class="flex flex-row gap-2">
+            {% for item in attention %}
+                {% component "unfold/helpers/label.html" with variant=item.variant text=item.text href=item.href %}{% endcomponent %}
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── KPI cards ───────────────────────────────────────── #}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        {% for kpi in kpis %}
+            {% component "unfold/components/card.html" with href=kpi.href footer=kpi.footer class="sora-kpi" %}
+                <p class="sora-eyebrow text-subtle flex flex-row items-center gap-2">
+                    <span class="material-symbols-outlined text-primary-600 dark:text-primary-400 text-lg">{{ kpi.icon }}</span>{{ kpi.title }}
+                </p>
+                <p class="sora-num font-semibold text-3xl text-important mt-2">{{ kpi.value }}</p>
+            {% endcomponent %}
+        {% endfor %}
+    </div>
+
+    {# ── Activity chart + health ─────────────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-8 min-w-0">
+            {% component "unfold/components/card.html" with title="Activity" description="Last 14 days" title_icon="monitoring" %}
+                <div class="flex flex-row gap-4 mb-4 text-xs text-subtle">
+                    {% for item in activity_legend %}
+                        <span class="flex flex-row items-center gap-2"><span class="sora-swatch" style="background: {{ item.color }}"></span>{{ item.label }}</span>
+                    {% endfor %}
+                </div>
+                {% component "unfold/components/chart/bar.html" with data=activity_chart height=280 %}{% endcomponent %}
+            {% endcomponent %}
+        </div>
+        <div class="lg:col-span-4 min-w-0">
+            {% component "unfold/components/card.html" with title="Health" description="Ratios across all students" title_icon="vital_signs" %}
+                <div class="flex flex-col gap-6">
+                    {% for item in progress %}
+                        {% component "unfold/components/progress.html" with title=item.title description=item.value|stringformat:"d"|add:"%" value=item.value %}{% endcomponent %}
+                        <p class="text-subtle text-xs" style="margin-top:-1rem">{{ item.description }}</p>
+                    {% endfor %}
+                </div>
+            {% endcomponent %}
+        </div>
+    </div>
+
+    {# ── Recent activity ─────────────────────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% component "unfold/components/card.html" with title="Latest PDFs" description="Most recent uploads" title_icon="picture_as_pdf" %}
+            <div class="flex flex-col gap-3">
+                {% for doc in recent_documents %}
+                    <a href="{% url 'admin:documents_document_change' doc.pk %}" class="flex flex-row items-center justify-between gap-3">
+                        <span class="min-w-0">
+                            <span class="block truncate text-important text-sm font-medium">{{ doc.original_name }}</span>
+                            <span class="block truncate text-subtle text-xs">{{ doc.user.email }} · {{ doc.created_at|timesince }} ago</span>
+                        </span>
+                        {% if doc.status == "DONE" %}
+                            {% component "unfold/helpers/label.html" with variant="success" text=doc.get_status_display %}{% endcomponent %}
+                        {% elif doc.status == "FAILED" %}
+                            {% component "unfold/helpers/label.html" with variant="danger" text=doc.get_status_display %}{% endcomponent %}
+                        {% else %}
+                            {% component "unfold/helpers/label.html" with variant="info" text=doc.get_status_display %}{% endcomponent %}
+                        {% endif %}
+                    </a>
+                {% empty %}
+                    <p class="text-subtle text-sm">No PDFs uploaded yet.</p>
+                {% endfor %}
+            </div>
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" with title="Latest quiz results" description="Most recently finished" title_icon="quiz" %}
+            <div class="flex flex-col gap-3">
+                {% for quiz in recent_quizzes %}
+                    <a href="{% url 'admin:quizzes_quizsession_change' quiz.pk %}" class="flex flex-row items-center justify-between gap-3">
+                        <span class="min-w-0">
+                            <span class="block truncate text-important text-sm font-medium">{{ quiz.deck_title|default:"Untitled deck" }}</span>
+                            <span class="block truncate text-subtle text-xs">{{ quiz.user.email }} · {{ quiz.finished_at|timesince }} ago</span>
+                        </span>
+                        <span class="sora-num font-semibold text-important text-sm shrink-0">{{ quiz.score }}/{{ quiz.total_questions }}</span>
+                    </a>
+                {% empty %}
+                    <p class="text-subtle text-sm">No quizzes finished yet.</p>
+                {% endfor %}
+            </div>
+        {% endcomponent %}
+    </div>
+
+</div>
+{% endblock %}

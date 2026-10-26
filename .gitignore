@@ -86,3 +86,6 @@ PRODUCT.md
 .agents/
 .claude/
 .impeccable/
+
+# Playwright MCP screenshots/snapshots (local only)
+.playwright-mcp/

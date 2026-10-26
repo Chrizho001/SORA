@@ -43,6 +43,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Applications
 # ──────────────────────────────────────────────
 INSTALLED_APPS = [
+    # Admin theme (must precede django.contrib.admin)
+    "unfold",
+    "unfold.contrib.filters",
     # Django
     "django.contrib.admin",
     "django.contrib.auth",
@@ -204,6 +207,7 @@ USE_TZ = True
 # ──────────────────────────────────────────────
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]  # admin brand assets
 
 # ──────────────────────────────────────────────
 # Templates (admin)
@@ -211,7 +215,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],  # admin dashboard override
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -338,3 +342,150 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 # ──────────────────────────────────────────────
 DOCUMENT_MAX_PAGES = env.int("DOCUMENT_MAX_PAGES", default=50)
 DOCUMENT_MAX_CHARS = env.int("DOCUMENT_MAX_CHARS", default=100000)
+
+# ──────────────────────────────────────────────
+# Admin theme: django-unfold (dashboard in config/admin_dashboard.py)
+# ──────────────────────────────────────────────
+from django.templatetags.static import static  # noqa: E402
+from django.urls import reverse_lazy  # noqa: E402
+
+# Unfold's login template omits Django's hidden "next" field, so a plain /admin/login/ would fall
+# back to /accounts/profile/. The API itself uses JWTs, so this only affects the admin.
+LOGIN_REDIRECT_URL = reverse_lazy("admin:index")
+
+
+def _nav(title, icon, model, **extra):
+    app_label, model_name = model.split(".")
+    return {
+        "title": title,
+        "icon": icon,
+        "link": reverse_lazy(f"admin:{app_label}_{model_name}_changelist"),
+        **extra,
+    }
+
+
+def _superuser_only(request):
+    return request.user.is_superuser
+
+
+UNFOLD = {
+    "SITE_TITLE": "SORA Admin",
+    "SITE_HEADER": "SORA",
+    "SITE_SUBHEADER": "Study assistant · operations",
+    "SITE_URL": FRONTEND_URL,
+    "SITE_ICON": lambda request: static("brand/sora-mark.svg"),
+    "SITE_FAVICONS": [
+        {
+            "rel": "icon",
+            "type": "image/svg+xml",
+            "href": lambda request: static("brand/sora-mark.svg"),
+        },
+    ],
+    "SHOW_VIEW_ON_SITE": False,
+    "SHOW_HISTORY": True,
+    "ENVIRONMENT": "config.admin_dashboard.environment_callback",
+    "DASHBOARD_CALLBACK": "config.admin_dashboard.dashboard_callback",
+    "STYLES": [lambda request: static("brand/admin.css")],
+    "BORDER_RADIUS": "10px",
+    "LOGIN": {"image": lambda request: static("brand/login-panel.svg")},
+    # Monochrome "studio paper" base (ink-tinted neutrals) + SORA's green signal (DESIGN.md).
+    "COLORS": {
+        "base": {
+            "50": "oklch(98.5% .002 265)",
+            "100": "oklch(96.6% .003 265)",
+            "200": "oklch(92.6% .005 265)",
+            "300": "oklch(86.9% .008 265)",
+            "400": "oklch(70.5% .012 265)",
+            "500": "oklch(55% .014 265)",
+            "600": "oklch(44.5% .015 265)",
+            "700": "oklch(37% .015 265)",
+            "800": "oklch(27.5% .014 265)",
+            "900": "oklch(21.5% .013 265)",
+            "950": "oklch(16% .011 265)",
+        },
+        "primary": {
+            "50": "oklch(98.2% .018 155.826)",
+            "100": "oklch(96.2% .044 156.743)",
+            "200": "oklch(92.5% .084 155.995)",
+            "300": "oklch(87.1% .15 154.449)",
+            "400": "oklch(72.3% .219 149.579)",
+            "500": "oklch(62.7% .194 149.214)",
+            "600": "oklch(52.7% .154 150.069)",
+            "700": "oklch(44.8% .119 151.328)",
+            "800": "oklch(39.3% .095 152.535)",
+            "900": "oklch(32% .08 152.9)",
+            "950": "oklch(26.6% .065 152.934)",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": "Overview",
+                "items": [
+                    {
+                        "title": "Dashboard",
+                        "icon": "space_dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
+            {
+                "title": "People",
+                "items": [
+                    _nav("Students", "group", "accounts.user"),
+                    _nav("Google accounts", "link", "accounts.socialaccount"),
+                    _nav("Groups", "shield_person", "auth.group", permission=_superuser_only),
+                ],
+            },
+            {
+                "title": "Study",
+                "items": [
+                    _nav("Decks", "style", "flashcards.deck"),
+                    _nav("Flashcards", "layers", "flashcards.flashcard"),
+                    _nav("Quiz sessions", "quiz", "quizzes.quizsession"),
+                ],
+            },
+            {
+                "title": "Workload",
+                "items": [
+                    _nav(
+                        "Documents",
+                        "picture_as_pdf",
+                        "documents.document",
+                        badge="config.admin_dashboard.failed_documents_badge",
+                    ),
+                    _nav("Summaries", "summarize", "documents.summary"),
+                    _nav("Tasks", "task_alt", "tasks.task"),
+                ],
+            },
+            {
+                "title": "Engagement",
+                "items": [
+                    _nav("Notifications", "notifications", "notifications.notification"),
+                    _nav("Preferences", "tune", "notifications.notificationpreference"),
+                    _nav("Push devices", "phonelink_ring", "notifications.pushsubscription"),
+                ],
+            },
+            {
+                "title": "Security",
+                "collapsible": True,
+                "items": [
+                    _nav(
+                        "Refresh tokens",
+                        "key",
+                        "token_blacklist.outstandingtoken",
+                        permission=_superuser_only,
+                    ),
+                    _nav(
+                        "Revoked tokens",
+                        "block",
+                        "token_blacklist.blacklistedtoken",
+                        permission=_superuser_only,
+                    ),
+                ],
+            },
+        ],
+    },
+}

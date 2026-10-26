@@ -90,6 +90,10 @@ to the Django API on **Render**, so the refresh cookie is first-party on the Ver
 6. **Google sign-in (manual):** Google Cloud Console → APIs & Services → Credentials → the OAuth web
    client → *Authorized JavaScript origins* → add `https://<Vercel domain>`.
 7. **Measure `NUM_PROXIES`** (§4) and update it on Render.
+7a. **Admin login:** the free tier has no shell, so set `DJANGO_SUPERUSER_EMAIL` and
+   `DJANGO_SUPERUSER_PASSWORD` on Render; the next boot creates the account (`deploy/start.sh`). Open
+   `https://<render url>/admin/`, then **delete both variables**. The admin (django-unfold) lives only on
+   the Render URL, not on the Vercel domain.
 8. Run the smoke test (§3).
 
 Migrations and `collectstatic` run on every start of the API container (`deploy/start.sh`).

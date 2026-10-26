@@ -8,6 +8,14 @@ set -euo pipefail
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
+# First admin account on hosts without a shell (Render free): set DJANGO_SUPERUSER_EMAIL and
+# DJANGO_SUPERUSER_PASSWORD once, then remove them. An existing account is left untouched.
+if [ -n "${DJANGO_SUPERUSER_EMAIL:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
+  export DJANGO_SUPERUSER_FIRST_NAME="${DJANGO_SUPERUSER_FIRST_NAME:-SORA}"
+  export DJANGO_SUPERUSER_LAST_NAME="${DJANGO_SUPERUSER_LAST_NAME:-Admin}"
+  python manage.py createsuperuser --noinput || echo "createsuperuser skipped (see message above)."
+fi
+
 celery -A config worker --beat --loglevel info --concurrency "${CELERY_CONCURRENCY:-2}" \
   --schedule "${MEDIA_ROOT:-/app/media}/celerybeat-schedule" &
 

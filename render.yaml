@@ -50,6 +50,11 @@ services:
         sync: false
       - key: VAPID_CLAIM_EMAIL
         sync: false
+      # First admin login (deploy/start.sh); remove both after the first successful boot.
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
       # 512 MB instance: 2 gunicorn workers + 1 Celery child (deploy/start.sh).
       - key: WEB_CONCURRENCY
         value: "2"

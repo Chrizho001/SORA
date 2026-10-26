@@ -115,6 +115,8 @@ frontend/src/
   outbound SMTP. `prod` refuses to start without `BREVO_API_KEY` or `EMAIL_HOST`.
 - `NUM_PROXIES`: two platforms sit in front of Django; measure it from the `xff=` field in the API access
   log after deploying (`docs/deployment.md` §4). A self-hosted Next.js rewrite adds no entry (measured).
+- Admin: django-unfold theme with an operations dashboard (`config/admin_dashboard.py`,
+  `templates/admin/index.html`), reachable only on the Render URL at `ADMIN_URL`.
 - Settings: `config.settings.prod` (`DEBUG=False`). `config.settings.demo` = prod + two flags for a laptop
   tunnel fallback. `config.settings.dev` is **never** exposed publicly.
 - Free-tier trade-offs (sleep after 15 min, temporary PDF storage, 30-day Postgres) and the full checklist:
