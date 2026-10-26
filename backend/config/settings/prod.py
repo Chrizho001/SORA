@@ -58,6 +58,11 @@ if BREVO_API_KEY:
     INSTALLED_APPS.append("anymail")
     EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
     ANYMAIL = {"BREVO_API_KEY": BREVO_API_KEY}
+    # Brevo rejects inline (CID) images; link them from the always-on frontend CDN instead.
+    EMAIL_INLINE_IMAGES = False
+    EMAIL_ASSET_BASE_URL = env(
+        "EMAIL_ASSET_BASE_URL", default=f"{FRONTEND_URL.rstrip('/')}/email/"
+    )
 elif EMAIL_HOST:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 else:

@@ -187,6 +187,10 @@ AUTH_COOKIE_PATH = "/api/v1/auth/"
 # Email verification (01-authentication.md §3)
 # ──────────────────────────────────────────────
 ACCOUNTS_EMAIL_VERIFICATION_MAX_AGE = 24 * 60 * 60  # 24 hours
+# Branded email images: inline CID attachments (SMTP) or absolute URLs. HTTP email APIs such as
+# Brevo reject inline attachments; the frontend serves the same files from public/email/.
+EMAIL_INLINE_IMAGES = env.bool("EMAIL_INLINE_IMAGES", default=True)
+EMAIL_ASSET_BASE_URL = env("EMAIL_ASSET_BASE_URL", default=f"{FRONTEND_URL.rstrip('/')}/email/")
 EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 
 # ──────────────────────────────────────────────

@@ -1,13 +1,15 @@
 """
 Email dispatching service for SORA Authentication.
-Renders responsive HTML emails containing SORA branding, mascot, and styled buttons,
-attaching inline graphics via standard MIME Content-ID (CID).
+Renders responsive HTML emails containing SORA branding, mascot, and styled buttons.
+Images are inline MIME Content-ID (CID) attachments, or absolute URLs under
+settings.EMAIL_ASSET_BASE_URL when settings.EMAIL_INLINE_IMAGES is False (HTTP APIs like Brevo).
 """
 
 import logging
 from email.mime.image import MIMEImage
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -27,13 +29,20 @@ def send_templated_email(
     user_id: Any | None = None,
 ) -> None:
     """
-    Render and dispatch a multipart HTML + Plain Text email with inline CID image attachments.
+    Render and dispatch a multipart HTML + Plain Text email with branded images.
     """
+    inline_images = settings.EMAIL_INLINE_IMAGES
+    if inline_images:
+        logo_src, mascot_src = "cid:sora_logo", "cid:sora_mascot"
+    else:
+        logo_src = urljoin(settings.EMAIL_ASSET_BASE_URL, "sora_logo.png")
+        mascot_src = urljoin(settings.EMAIL_ASSET_BASE_URL, mascot_filename)
+
     # Provide default template contexts for branding
     email_context = {
         "frontend_url": getattr(settings, "FRONTEND_URL", "http://localhost:3000"),
-        "logo_src": "cid:sora_logo",
-        "mascot_src": "cid:sora_mascot",
+        "logo_src": logo_src,
+        "mascot_src": mascot_src,
         **context,
     }
 
@@ -53,7 +62,17 @@ def send_templated_email(
         to=[recipient_email],
     )
     message.attach_alternative(html_content, "text/html")
+    if inline_images:
+        _attach_inline_images(message, mascot_filename)
 
+    message.send(fail_silently=False)
+    if user_id:
+        logger.info("Templated email '%s' successfully sent to user_id=%s", subject, user_id)
+    else:
+        logger.info("Templated email '%s' successfully sent", subject)
+
+
+def _attach_inline_images(message: EmailMultiAlternatives, mascot_filename: str) -> None:
     # Attach SORA Logo as inline CID
     logo_path = ASSETS_DIR / "sora_logo.png"
     if logo_path.exists():
@@ -77,9 +96,3 @@ def send_templated_email(
                 message.attach(mascot_mime)
         except Exception as e:
             logger.warning("Failed to attach inline mascot to email: %s", e)
-
-    message.send(fail_silently=False)
-    if user_id:
-        logger.info("Templated email '%s' successfully sent to user_id=%s", subject, user_id)
-    else:
-        logger.info("Templated email '%s' successfully sent", subject)

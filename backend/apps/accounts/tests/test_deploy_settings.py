@@ -43,6 +43,8 @@ print(json.dumps({
     "STATICFILES_BACKEND": settings.STORAGES["staticfiles"]["BACKEND"],
     "NUM_PROXIES": settings.REST_FRAMEWORK.get("NUM_PROXIES"),
     "ANYMAIL_HAS_BREVO_KEY": bool(getattr(settings, "ANYMAIL", {}).get("BREVO_API_KEY")),
+    "EMAIL_INLINE_IMAGES": settings.EMAIL_INLINE_IMAGES,
+    "EMAIL_ASSET_BASE_URL": settings.EMAIL_ASSET_BASE_URL,
 }))
 """
 
@@ -130,10 +132,14 @@ class TestProdEmailSettings:
         )
         assert s["EMAIL_BACKEND"] == "anymail.backends.brevo.EmailBackend"
         assert s["ANYMAIL_HAS_BREVO_KEY"] is True
+        # Brevo rejects inline (CID) attachments: link images from the always-on frontend CDN.
+        assert s["EMAIL_INLINE_IMAGES"] is False
+        assert s["EMAIL_ASSET_BASE_URL"] == "https://sora.example.com/email/"
 
     def test_prod_uses_smtp_when_only_email_host_set(self):
         s = load_settings("config.settings.prod")
         assert s["EMAIL_BACKEND"] == "django.core.mail.backends.smtp.EmailBackend"
+        assert s["EMAIL_INLINE_IMAGES"] is True
 
     def test_prod_refuses_to_start_without_any_email_transport(self):
         proc = run_settings("config.settings.prod", drop=("EMAIL_HOST",))
