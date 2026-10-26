@@ -76,13 +76,19 @@ def send_due_task_reminders():
     now = timezone.now()
     window_end = now + timedelta(hours=24)
 
-    tasks = Task.objects.filter(
-        is_completed=False,
-        due_at__gt=now,
-        due_at__lte=window_end,
-        reminder_sent_at__isnull=True,
-    ).select_related("user")
-    for task in tasks:
+    # Pass 1: due-soon
+    due_soon_tasks = (
+        Task.objects.filter(
+            is_completed=False,
+            due_at__gt=now,
+            due_at__lte=window_end,
+            reminder_sent_at__isnull=True,
+        )
+        .select_related("user")
+        .iterator()
+    )
+
+    for task in due_soon_tasks:
         try:
             NotificationService.notify(
                 recipient=task.user,
@@ -91,7 +97,30 @@ def send_due_task_reminders():
                 body=f"Your task '{task.title}' is due soon.",
                 data={"task_id": str(task.id)},
             )
-            task.reminder_sent_at = now
-            task.save(update_fields=["reminder_sent_at"])
+            Task.objects.filter(pk=task.pk).update(reminder_sent_at=now)
         except Exception as e:
             logger.error("Failed to send reminder for task_id=%s: %s", task.id, e)
+
+    # Pass 2: overdue
+    overdue_tasks = (
+        Task.objects.filter(
+            is_completed=False,
+            due_at__lt=now,
+            overdue_notified_at__isnull=True,
+        )
+        .select_related("user")
+        .iterator()
+    )
+
+    for task in overdue_tasks:
+        try:
+            NotificationService.notify(
+                recipient=task.user,
+                notification_type=NotificationType.TASK_OVERDUE,
+                title="Task overdue",
+                body=f"'{task.title}' is overdue.",
+                data={"task_id": str(task.id)},
+            )
+            Task.objects.filter(pk=task.pk).update(overdue_notified_at=now)
+        except Exception as e:
+            logger.error("Failed to send overdue notification for task_id=%s: %s", task.id, e)

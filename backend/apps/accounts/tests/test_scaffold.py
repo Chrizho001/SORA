@@ -25,14 +25,14 @@ class TestScaffoldSmokeTests:
     @pytest.mark.django_db
     def test_database_access_works(self):
         """The test database is accessible — we can create and query objects."""
-        User = get_user_model()
-        user = User.objects.create_user(
+        user_model = get_user_model()
+        user = user_model.objects.create_user(
             email="smoke@test.com",
             password="SmokeTe$t123",
             first_name="Smoke",
             last_name="Test",
         )
-        assert User.objects.filter(pk=user.pk).exists()
+        assert user_model.objects.filter(pk=user.pk).exists()
 
     def test_auth_user_model_is_accounts_user(self):
         """AUTH_USER_MODEL points to our custom user model."""
@@ -40,6 +40,54 @@ class TestScaffoldSmokeTests:
 
     def test_get_user_model_returns_custom_user(self):
         """get_user_model() returns the accounts.User class."""
-        User = get_user_model()
-        assert User.__name__ == "User"
-        assert User._meta.app_label == "accounts"
+        user_model = get_user_model()
+        assert user_model.__name__ == "User"
+        assert user_model._meta.app_label == "accounts"
+
+    def test_prod_settings_missing_required_env_vars_raises_improperly_configured(
+        self, monkeypatch
+    ):
+        """Production settings fail closed when required env vars are missing (SEC-11)."""
+        import importlib
+
+        from django.core.exceptions import ImproperlyConfigured
+
+        monkeypatch.delenv("FRONTEND_URL", raising=False)
+        monkeypatch.delenv("EMAIL_HOST", raising=False)
+        monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+
+        with pytest.raises(ImproperlyConfigured):
+            import config.settings.prod
+
+            importlib.reload(config.settings.prod)
+
+        # Missing GOOGLE_CLIENT_ID specifically
+        monkeypatch.setenv("FRONTEND_URL", "https://sora.study")
+        monkeypatch.setenv("EMAIL_HOST", "smtp.example.com")
+        monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+
+        with pytest.raises(ImproperlyConfigured, match="GOOGLE_CLIENT_ID"):
+            import config.settings.prod
+
+            importlib.reload(config.settings.prod)
+
+    def test_prod_settings_subprocess_exits_nonzero_when_env_missing(self):
+        """
+        A subprocess with DJANGO_SETTINGS_MODULE=config.settings.prod exits
+        non-zero if required env vars are missing.
+        """
+        import os
+        import subprocess
+        import sys
+
+        clean_env = {
+            "PATH": os.environ.get("PATH", ""),
+            "DJANGO_SETTINGS_MODULE": "config.settings.prod",
+        }
+        proc = subprocess.run(
+            [sys.executable, "-c", "import django; django.setup()"],
+            env=clean_env,
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode != 0

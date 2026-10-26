@@ -68,7 +68,7 @@ def test_validate_flashcards_data_rejects_invalid(invalid_input):
 def test_flashcard_generator_client_without_api_key_raises_error(settings):
     settings.AI_API_KEY = ""
     client = FlashcardGeneratorClient(api_key="")
-    with pytest.raises(DocumentProcessingError, match="AI_API_KEY"):
+    with pytest.raises(DocumentProcessingError, match="AI service authentication failed"):
         client.generate("Some summary text")
 
 
@@ -167,5 +167,5 @@ def test_flashcard_generator_client_invalid_json_raises_error(monkeypatch):
     monkeypatch.setattr("apps.flashcards.ai.requests.post", lambda *a, **kw: mock_resp)
 
     client = FlashcardGeneratorClient(api_key="valid-key")
-    with pytest.raises(DocumentProcessingError, match="Failed to parse"):
+    with pytest.raises(DocumentProcessingError, match="AI service error"):
         client.generate("Some text")

@@ -71,6 +71,32 @@ class TestRegisterAPI:
         assert email_msg.to == ["emailtest@uni.edu"]
         assert f"{settings.FRONTEND_URL}/verify-email?token=" in email_msg.body
 
+    def test_email_link_ignores_origin_and_referer_headers(self, api_client):
+        mail.outbox.clear()
+        payload = {
+            "email": "origin_check@uni.edu",
+            "password": "Secure!Password123",
+            "password_confirm": "Secure!Password123",
+            "first_name": "Origin",
+            "last_name": "Check",
+        }
+        response = api_client.post(
+            self.url,
+            payload,
+            format="json",
+            HTTP_ORIGIN="https://evil.example",
+            HTTP_REFERER="https://evil.example/x",
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        links = [
+            line.strip()
+            for line in mail.outbox[0].body.splitlines()
+            if "verify-email?token=" in line
+        ]
+        assert len(links) == 1
+        assert links[0].startswith(settings.FRONTEND_URL)
+        assert "evil.example" not in mail.outbox[0].body
+
     def test_duplicate_email_any_case_returns_400(self, api_client, user):
         # user email is testuser@example.com
         payload = {
@@ -145,3 +171,32 @@ class TestRegisterAPI:
         response = api_client.post(self.url, {}, format="json")
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
         assert response.data["code"] == "throttled"
+
+    def test_registration_email_failure_does_not_log_email(self, api_client, monkeypatch, caplog):
+        import logging
+        from unittest.mock import MagicMock
+
+        apps_logger = logging.getLogger("apps")
+        caplog.set_level(logging.DEBUG, logger="apps")
+        apps_logger.addHandler(caplog.handler)
+
+        try:
+            mock_send = MagicMock(side_effect=Exception("SMTP connection refused"))
+            monkeypatch.setattr("apps.accounts.tasks.send_templated_email", mock_send)
+
+            target_email = "super_private_secret@uni.edu"
+            payload = {
+                "email": target_email,
+                "password": "Secure!Password123",
+                "password_confirm": "Secure!Password123",
+                "first_name": "Private",
+                "last_name": "User",
+            }
+
+            response = api_client.post(self.url, payload, format="json")
+            assert response.status_code == status.HTTP_201_CREATED
+            assert target_email not in caplog.text
+            user = User.objects.get(email=target_email)
+            assert str(user.id) in caplog.text
+        finally:
+            apps_logger.removeHandler(caplog.handler)

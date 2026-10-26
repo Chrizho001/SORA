@@ -31,9 +31,12 @@ def test_prod_settings_refuses_mock_ai_provider(monkeypatch):
 def test_prod_settings_accepts_openai_ai_provider(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("SECRET_KEY", "dummy-secret-key")
+    monkeypatch.setenv("FRONTEND_URL", "https://sora.study")
+    monkeypatch.setenv("EMAIL_HOST", "smtp.example.com")
     import config.settings.base
 
     importlib.reload(config.settings.base)
+
     mod = importlib.import_module("config.settings.prod")
     importlib.reload(mod)
     assert mod.AI_PROVIDER == "openai"
@@ -52,7 +55,7 @@ def test_mock_summarizer_returns_mock_model_name():
 def test_summarizer_client_without_api_key_raises_error(settings):
     settings.AI_API_KEY = ""
     client = SummarizerClient(api_key="")
-    with pytest.raises(DocumentProcessingError, match="AI_API_KEY"):
+    with pytest.raises(DocumentProcessingError, match="AI service authentication failed"):
         client.summarize("Sample text")
 
 

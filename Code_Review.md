@@ -51,7 +51,7 @@ This file is the **single source of truth for open work**. It supersedes
 
 ## 1. Backend — Security
 
-- [ ] **SEC-01 · P0 · An attacker can pre-register a victim's email and keep access after the victim signs in with Google**
+- [x] **SEC-01 · P0 · An attacker can pre-register a victim's email and keep access after the victim signs in with Google**
   - **Where:** `backend/apps/accounts/services.py` `login_with_google()` (around lines 270–300). Spec rule:
     `architecture/01-authentication.md` §5 rule 9 (now corrected).
   - **Problem:** If an *unverified* password account exists for an email and that person later signs in
@@ -69,7 +69,7 @@ This file is the **single source of truth for open work**. It supersedes
     is still usable.
   - **Prompt:** P-01
 
-- [ ] **SEC-02 · P0 · Token-refresh, email-verification and reset-confirm endpoints have no throttle**
+- [x] **SEC-02 · P0 · Token-refresh, email-verification and reset-confirm endpoints have no throttle**
   - **Where:** `backend/apps/accounts/views.py` — `VerifyEmailAPIView`, `TokenRefreshAPIView`,
     `PasswordResetConfirmAPIView`. Rates are set in `backend/config/settings/base.py` `DEFAULT_THROTTLE_RATES`.
   - **Problem:** unlimited guessing or brute force of verification and reset tokens, and unlimited refresh
@@ -81,7 +81,7 @@ This file is the **single source of truth for open work**. It supersedes
     the overrides don't leak into other tests.
   - **Prompt:** P-01
 
-- [ ] **SEC-03 · P0 · Rate limiting is wrong behind a reverse proxy**
+- [x] **SEC-03 · P0 · Rate limiting is wrong behind a reverse proxy**
   - **Where:** `backend/config/settings/base.py` (`NUM_PROXIES` defaults to 0) and `prod.py` (does not set it).
   - **Problem:** behind any proxy (Render, Railway, Nginx, a Next.js rewrite), every user appears to come
     from the proxy's IP. All users then share one login bucket of 5/min, so one person can lock everyone out.
@@ -91,7 +91,7 @@ This file is the **single source of truth for open work**. It supersedes
     states how many proxies sit in front of Django.
   - **Prompt:** P-01
 
-- [ ] **SEC-04 · P1 · Oversized uploads are buffered before they are rejected; empty files are accepted**
+- [x] **SEC-04 · P1 · Oversized uploads are buffered before they are rejected; empty files are accepted**
   - **Where:** `backend/apps/documents/serializers.py` `validate_file`; settings.
   - **Problem:** the 10 MB check runs only after Django has read the whole body into memory or a temp file.
     A 0-byte file passes the magic-byte check path inconsistently.
@@ -102,7 +102,7 @@ This file is the **single source of truth for open work**. It supersedes
     (12 MB). Test it with a fake `CONTENT_LENGTH` header.
   - **Prompt:** P-01
 
-- [ ] **SEC-05 · P0 · Internal error text leaks to users**
+- [x] **SEC-05 · P0 · Internal error text leaks to users**
   - **Where:** `backend/apps/documents/tasks.py` (the generic `except` writes
     `f"We couldn't process this PDF. {str(e)}"`); `backend/apps/documents/ai.py` and `backend/apps/flashcards/ai.py`
     (`f"... error: {exc}"`, `f"Google Gemini API error ({status_code}): {err_msg}"`, auth-failure text);
@@ -116,14 +116,14 @@ This file is the **single source of truth for open work**. It supersedes
     containing `"SECRET-INTERNAL"` never appears in `error_message`, in the notification `body`, or in `data`.
   - **Prompt:** P-03
 
-- [ ] **SEC-06 · P1 · Email addresses are written to logs**
+- [x] **SEC-06 · P1 · Email addresses are written to logs**
   - **Where:** `backend/apps/accounts/services.py:68` and `:390` (`user.email`);
     `backend/apps/accounts/emails.py:81` (`recipient_email`).
   - **Acceptable solution / recommended fix:** log `user_id` only. Add a test with `caplog` asserting the email
     string is absent.
   - **Prompt:** P-03
 
-- [ ] **SEC-07 · P1 · Logout can revoke other users' push subscriptions**
+- [x] **SEC-07 · P1 · Logout can revoke other users' push subscriptions**
   - **Where:** `backend/apps/accounts/views.py` `LogoutAPIView` (push-subscription revoke by `endpoint`).
   - **Problem:** an unauthenticated logout carrying any `endpoint` revokes whichever subscription matches,
     regardless of owner.
@@ -138,13 +138,13 @@ This file is the **single source of truth for open work**. It supersedes
   - **Recommended fix:** also give Redis a password (`--requirepass`) and use a matching `REDIS_URL`.
   - **Prompt:** P-08
 
-- [ ] **SEC-09 · P2 · An in-progress quiz exposes `flashcard.id`, so answers can be looked up mid-quiz**
+- [x] **SEC-09 · P2 · An in-progress quiz exposes `flashcard.id`, so answers can be looked up mid-quiz**
   - **Where:** `backend/apps/quizzes/serializers.py` (`QuizFlashcardSerializer` nested in the question).
   - **Acceptable solution:** remove the nested `flashcard` from the quiz-question payload. `question_text`
     is enough. Fixed as part of FEAT-02.
   - **Prompt:** P-05
 
-- [ ] **SEC-10 · P2 · Two concurrent refreshes with the same token both succeed**
+- [x] **SEC-10 · P2 · Two concurrent refreshes with the same token both succeed**
   - **Where:** `backend/apps/accounts/views.py` `TokenRefreshAPIView` (blacklist-then-mint without a lock).
   - **Acceptable solution:** document it as accepted risk once the frontend uses a single in-flight refresh
     (FE-02).
@@ -152,7 +152,7 @@ This file is the **single source of truth for open work**. It supersedes
     `get_or_create`. If it was not created by this request, return 401 `refresh_invalid`.
   - **Prompt:** P-01
 
-- [ ] **SEC-11 · P1 · Production settings fail open**
+- [x] **SEC-11 · P1 · Production settings fail open**
   - **Where:** `backend/config/settings/prod.py`, `base.py`.
   - **Problem:** `CSRF_TRUSTED_ORIGINS` defaults to localhost, `EMAIL_HOST` to `""` and `GOOGLE_CLIENT_ID`
     to `""`, so a misconfigured deploy starts and silently breaks. The docstring still says "stub".
@@ -161,7 +161,7 @@ This file is the **single source of truth for open work**. It supersedes
     docstring.
   - **Prompt:** P-01
 
-- [ ] **SEC-12 · P0 (guard rail) · Email links must only ever be built from `settings.FRONTEND_URL`**
+- [x] **SEC-12 · P0 (guard rail) · Email links must only ever be built from `settings.FRONTEND_URL`**
   - **Where:** `backend/apps/accounts/services.py` (verification and reset link builders).
   - **Problem:** the ngrok branch built links from the request `Origin`/`Referer`, which allowed reset-token
     theft through a poisoned link. `main` is currently correct; this item adds the regression test.
@@ -172,7 +172,7 @@ This file is the **single source of truth for open work**. It supersedes
 
 ## 2. Backend — Correctness
 
-- [ ] **BUG-01 · P0 · Duplicate answers inflate the quiz score (verified: 50/4)**
+- [x] **BUG-01 · P0 · Duplicate answers inflate the quiz score (verified: 50/4)**
   - **Where:** `backend/apps/quizzes/services.py` `submit_quiz()`; `backend/apps/quizzes/serializers.py`
     `SubmitQuizSerializer`.
   - **Problem:**
@@ -187,7 +187,7 @@ This file is the **single source of truth for open work**. It supersedes
     the service. Tests cover the duplicate, foreign, invalid-choice, partial and empty submissions.
   - **Prompt:** P-02
 
-- [ ] **BUG-02 · P0 · The flashcard-failure notification uses the wrong type and leaks errors**
+- [x] **BUG-02 · P0 · The flashcard-failure notification uses the wrong type and leaks errors**
   - **Where:** `backend/apps/flashcards/tasks.py` (failure branch).
   - **Problem:**
     - It sends `PDF_SUMMARY_FAILED`.
@@ -197,7 +197,7 @@ This file is the **single source of truth for open work**. It supersedes
     and replace `pass` with `logger.exception`.
   - **Prompt:** P-03
 
-- [ ] **BUG-03 · P0 · Document processing is not idempotent; a duplicate task marks a finished document FAILED**
+- [x] **BUG-03 · P0 · Document processing is not idempotent; a duplicate task marks a finished document FAILED**
   - **Where:** `backend/apps/documents/tasks.py` `process_document()`. Celery uses `CELERY_TASK_ACKS_LATE=True`,
     so redelivery happens.
   - **Problem:** on a second delivery, `Summary.objects.create()` hits the OneToOne constraint. The generic
@@ -210,7 +210,7 @@ This file is the **single source of truth for open work**. It supersedes
   - **Recommended fix:** as above, plus a `processing_started_at` field (migration) that BUG-05 uses.
   - **Prompt:** P-02
 
-- [ ] **BUG-04 · P0 · Upload queues the Celery task before the transaction commits, and has no broker-failure handling**
+- [x] **BUG-04 · P0 · Upload queues the Celery task before the transaction commits, and has no broker-failure handling**
   - **Where:** `backend/apps/documents/views.py` `create()`.
   - **Problem:** the worker can start before the row is committed. If Redis is down, the user gets a 500
     and is left with a document stuck in `UPLOADED`.
@@ -218,7 +218,7 @@ This file is the **single source of truth for open work**. It supersedes
     If enqueueing fails, set `FAILED` with `"Failed to queue document processing."` and log it.
   - **Prompt:** P-02
 
-- [ ] **BUG-05 · P0 · Retry is racy, can re-run finished documents, and bypasses the AI budget**
+- [x] **BUG-05 · P0 · Retry is racy, can re-run finished documents, and bypasses the AI budget**
   - **Where:** `backend/apps/documents/views.py` `retry()`.
   - **Problem:**
     - The check-then-set is not atomic, so two clicks queue two jobs.
@@ -230,14 +230,14 @@ This file is the **single source of truth for open work**. It supersedes
     `ai_jobs` throttle scope for retry, and enqueue on commit.
   - **Prompt:** P-02
 
-- [ ] **BUG-06 · P0 · Regenerating flashcards deletes every card of the document, including the user's edits**
+- [x] **BUG-06 · P0 · Regenerating flashcards deletes every card of the document, including the user's edits**
   - **Where:** `backend/apps/flashcards/tasks.py` (`Flashcard.objects.filter(document=document).delete()`).
   - **Problem:** with manual cards (FEAT-01) this would destroy user work.
   - **Acceptable solution:** AI generation **appends** to a deck and skips cards whose normalised question
     already exists in that deck. Fixed as part of FEAT-01.
   - **Prompt:** P-04
 
-- [ ] **BUG-07 · P1 · Task reminders never fire again after a task is rescheduled or reopened; overdue is never sent**
+- [x] **BUG-07 · P1 · Task reminders never fire again after a task is rescheduled or reopened; overdue is never sent**
   - **Where:** `backend/apps/notifications/tasks.py` `send_due_task_reminders`; `backend/apps/tasks/serializers.py` / model.
   - **Problem:** `reminder_sent_at` is never cleared when `due_at` changes or a task is re-opened.
     `TASK_OVERDUE` exists but is never emitted.
@@ -246,14 +246,14 @@ This file is the **single source of truth for open work**. It supersedes
     `TASK_OVERDUE` once per task.
   - **Prompt:** P-06 (spec: `architecture/02-tasks.md` §5, Group 4)
 
-- [ ] **BUG-08 · P1 · `?date=` filters by UTC day, so evening tasks show on the wrong day**
+- [x] **BUG-08 · P1 · `?date=` filters by UTC day, so evening tasks show on the wrong day**
   - **Where:** `backend/apps/tasks/views.py` (`due_at__date`).
   - **Acceptable solution:** accept an optional `tz` (IANA name, validated with `zoneinfo`). Convert `date`
     to the `[local midnight, next local midnight)` range in that zone and filter with `due_at__gte/__lt`,
     which also uses the index. Without `tz`, fall back to UTC.
   - **Prompt:** P-06
 
-- [ ] **BUG-09 · P0 · A Redis outage turns a successful password change into a 500**
+- [x] **BUG-09 · P0 · A Redis outage turns a successful password change into a 500**
   - **Where:** `backend/apps/notifications/notification_service.py` (`send_web_push_task.delay()` called
     synchronously).
   - **Problem:** `change_password` and `confirm_password_reset` call `notify`. If the broker is down, the
@@ -263,7 +263,7 @@ This file is the **single source of truth for open work**. It supersedes
     `try/except` that logs. The in-app `Notification` row is still created.
   - **Prompt:** P-03
 
-- [ ] **BUG-10 · P1 · Email is sent synchronously with no timeout**
+- [x] **BUG-10 · P1 · Email is sent synchronously with no timeout**
   - **Where:** `backend/apps/accounts/services.py` (`on_commit(send_…)` runs in the request thread);
     settings (no `EMAIL_TIMEOUT`).
   - **Problem:** a slow SMTP or Resend server hangs register and reset, which breaks the NFR 2–3 s budget.
@@ -273,13 +273,13 @@ This file is the **single source of truth for open work**. It supersedes
     `on_commit`. Tests run eagerly and assert through `mail.outbox`.
   - **Prompt:** P-03
 
-- [ ] **BUG-11 · P2 · Documents accept PUT and PATCH, which do nothing but return 200**
+- [x] **BUG-11 · P2 · Documents accept PUT and PATCH, which do nothing but return 200**
   - **Where:** `backend/apps/documents/views.py` (`ModelViewSet`).
   - **Acceptable solution:** set `http_method_names = ["get", "post", "delete", "head", "options"]`.
     Test that PATCH returns 405.
   - **Prompt:** P-02
 
-- [ ] **BUG-12 · P0 · Quiz choices can contain the correct answer twice, or near-identical answers**
+- [x] **BUG-12 · P0 · Quiz choices can contain the correct answer twice, or near-identical answers**
   - **Where:** `backend/apps/quizzes/services.py` `start_quiz()`.
   - **Problem:** distractors are any other card's answers. Identical answer text produces duplicate choices,
     and grading by string equality then marks either one correct. Every card becomes a question (no cap).
@@ -301,7 +301,7 @@ This file is the **single source of truth for open work**. It supersedes
     `{"detail": "Internal server error.", "code": "server_error"}` for unhandled exceptions when `DEBUG=False`.
   - **Prompt:** P-08
 
-- [ ] **BUG-14 · P2 · The document task crashes if the document is deleted while processing**
+- [x] **BUG-14 · P2 · The document task crashes if the document is deleted while processing**
   - **Where:** `backend/apps/documents/tasks.py` (the failure handlers call `save(update_fields=…)` on a
     deleted row).
   - **Acceptable solution:** covered by BUG-03 (re-fetch the row; return on `DoesNotExist`).
@@ -313,7 +313,7 @@ The owner decided that **flashcards are created manually, grouped into Decks; AI
 optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual-flashcards-and-decks.md`,
 `architecture/04-flashcards.md` and `architecture/05-quiz.md`.
 
-- [ ] **FEAT-01 · P0 · Decks and manual flashcard create, edit and delete (SRS §3.5)**
+- [x] **FEAT-01 · P0 · Decks and manual flashcard create, edit and delete (SRS §3.5)**
   - **Spec:** `architecture/04-flashcards.md` (Status: READY). Test plan Groups 1–4.
   - **Acceptable solution:**
     - A `Deck` model.
@@ -324,7 +324,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     - AI generation appends to a deck and dedupes (BUG-06).
   - **Prompt:** P-04
 
-- [ ] **FEAT-02 · P0 · Quizzes start from a deck; the generation rules are improved**
+- [x] **FEAT-02 · P0 · Quizzes start from a deck; the generation rules are improved**
   - **Spec:** `architecture/05-quiz.md` (Status: READY). Test plan Groups 1–3.
   - **Acceptable solution:**
     - `POST /api/v1/decks/{id}/start-quiz/` with `{question_count?}`.
@@ -350,7 +350,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `django_assert_num_queries` test with 1 and 5 documents giving the same count.
   - **Prompt:** P-07
 
-- [ ] **PERF-02 · P1 · The quiz-session list causes N+1 queries and embeds every question**
+- [x] **PERF-02 · P1 · The quiz-session list causes N+1 queries and embeds every question**
   - **Where:** `backend/apps/quizzes/views.py`, `serializers.py`.
   - **Acceptable solution:** list uses a `QuizSessionListSerializer` (no questions); retrieve uses
     `prefetch_related("questions")`. Add a query-count test.

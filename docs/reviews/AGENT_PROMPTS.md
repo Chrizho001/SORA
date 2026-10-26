@@ -58,9 +58,13 @@ P-01, P-02, P-03, P-04, P-05, P-07, P-08, P-09, P-10, P-11, P-12, P-14, P-15, th
 >    verification).
 > 4. **Frontend:** TypeScript strict, no `any`, no tokens in `localStorage`/`sessionStorage`. Run
 >    `npx tsc --noEmit && npm run lint` and keep them clean.
-> 5. Before finishing, run all of these and fix anything red:
->    `cd backend && pytest -q && pytest --cov=apps -q | tail -30 && ruff check . && ruff format --check .`
->    For frontend prompts, also: `cd frontend && npx tsc --noEmit && npm run lint && npm run build`.
+> 5. Before finishing, run the checks for your track and fix anything red:
+>    - **Backend prompts (P-01…P-08):**
+>      `cd backend && pytest -q && pytest --cov=apps -q | tail -30 && ruff check . && ruff format --check .`
+>    - **Frontend prompts (P-09…P-17):** only `cd frontend && npx tsc --noEmit && npm run lint && npm run build`.
+>      Do **not** run `pytest`, `migrate` or `runserver`. The backend agent may be using the same Postgres
+>      test database at the same moment. Use the backend that is already running on port 8000.
+>    - **Final prompts (P-18…P-20):** both.
 > 6. Tick (`- [x]`) **only** the `Code_Review.md` items you fully fixed. Also tick the matching test-plan
 >    items in the spec file. If you only partly fixed something, leave it unticked and add an indented
 >    `- Note (agent): …` line under it.

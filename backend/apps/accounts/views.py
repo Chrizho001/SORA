@@ -56,6 +56,7 @@ class VerifyEmailAPIView(APIView):
     """
 
     permission_classes = [AllowAny]
+    throttle_scope = "auth_verify"
 
     def post(self, request, *args, **kwargs):
         from .serializers import VerifyEmailSerializer
@@ -166,6 +167,7 @@ class TokenRefreshAPIView(APIView):
     """
 
     permission_classes = [AllowAny, RequireXMLHttpRequest]
+    throttle_scope = "auth_refresh"
 
     def post(self, request, *args, **kwargs):
         from django.conf import settings
@@ -223,10 +225,38 @@ class TokenRefreshAPIView(APIView):
             clear_refresh_cookie(response)
             return response
 
-        # Rotate token
-        refresh.blacklist()
-        new_refresh = RefreshToken.for_user(user)
-        new_refresh["auth_time"] = auth_time
+        # Rotate token atomically
+        from django.db import transaction
+        from rest_framework_simplejwt.token_blacklist.models import (
+            BlacklistedToken,
+            OutstandingToken,
+        )
+        from rest_framework_simplejwt.utils import datetime_from_epoch
+
+        jti = refresh.payload.get("jti")
+        exp = refresh.payload.get("exp")
+
+        with transaction.atomic():
+            outstanding, _ = OutstandingToken.objects.get_or_create(
+                jti=jti,
+                defaults={
+                    "user": user,
+                    "created_at": refresh.current_time,
+                    "token": str(refresh),
+                    "expires_at": datetime_from_epoch(exp),
+                },
+            )
+            _, created = BlacklistedToken.objects.get_or_create(token=outstanding)
+            if not created:
+                response = Response(
+                    {"detail": "Refresh token invalid or expired.", "code": "refresh_invalid"},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+                clear_refresh_cookie(response)
+                return response
+
+            new_refresh = RefreshToken.for_user(user)
+            new_refresh["auth_time"] = auth_time
 
         response = Response({"access": str(new_refresh.access_token)}, status=status.HTTP_200_OK)
         set_refresh_cookie(response, str(new_refresh))
@@ -249,29 +279,31 @@ class LogoutAPIView(APIView):
 
         cookie_name = settings.AUTH_REFRESH_COOKIE_NAME
         refresh_token_str = request.COOKIES.get(cookie_name)
-        user_id = None
+        user = None
 
         if refresh_token_str:
             try:
                 refresh = RefreshToken(refresh_token_str)
                 user_id = refresh.payload.get("user_id")
+                if user_id:
+                    from django.contrib.auth import get_user_model
+
+                    user_model = get_user_model()
+                    user = user_model.objects.filter(id=user_id, is_active=True).first()
                 refresh.blacklist()
             except TokenError:
                 # Token already invalid or blacklisted, ignore
                 pass
 
         push_endpoint = request.data.get("push_endpoint")
-        if push_endpoint:
+        if push_endpoint and user:
             from django.utils import timezone
 
             from apps.notifications.models import PushSubscription
 
-            subs = PushSubscription.objects.filter(endpoint=push_endpoint, revoked_at__isnull=True)
-            if request.user and request.user.is_authenticated:
-                subs = subs.filter(user=request.user)
-            elif user_id:
-                subs = subs.filter(user_id=user_id)
-            subs.update(revoked_at=timezone.now())
+            PushSubscription.objects.filter(user=user, endpoint=push_endpoint).update(
+                revoked_at=timezone.now()
+            )
 
         response = Response(status=status.HTTP_205_RESET_CONTENT)
         clear_refresh_cookie(response)
@@ -433,6 +465,7 @@ class PasswordResetConfirmAPIView(APIView):
     """
 
     permission_classes = [AllowAny]
+    throttle_scope = "auth_password"
 
     def post(self, request, *args, **kwargs):
         from rest_framework.exceptions import APIException

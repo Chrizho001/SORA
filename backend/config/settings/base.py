@@ -66,6 +66,7 @@ INSTALLED_APPS = [
 # ──────────────────────────────────────────────
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "config.middleware.RequestSizeLimitMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -129,8 +130,12 @@ REST_FRAMEWORK = {
         "auth_login": "5/min",
         "auth_register": "10/hour",
         "auth_email": "5/hour",
-        "auth_password": "5/min",
+        "auth_password": "10/min",
+        "auth_verify": "10/min",
+        "auth_refresh": "30/min",
         "ai_jobs": "20/day",
+        "quiz_create": "30/hour",
+        "quiz_submit": "30/min",
     },
     "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
     "NUM_PROXIES": env.int("NUM_PROXIES", default=0),
@@ -177,6 +182,7 @@ AUTH_COOKIE_PATH = "/api/v1/auth/"
 # Email verification (01-authentication.md §3)
 # ──────────────────────────────────────────────
 ACCOUNTS_EMAIL_VERIFICATION_MAX_AGE = 24 * 60 * 60  # 24 hours
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 
 # ──────────────────────────────────────────────
 # Google sign-in (ADR-0002, 01-authentication.md §6)
@@ -308,9 +314,7 @@ VAPID_CLAIM_EMAIL = env("VAPID_CLAIM_EMAIL", default="")
 # ──────────────────────────────────────────────
 AI_PROVIDER = env("AI_PROVIDER", default="gemini")
 AI_API_KEY = env("AI_API_KEY", default="")
-AI_BASE_URL = env(
-    "AI_BASE_URL", default="https://generativelanguage.googleapis.com/v1beta/models"
-)
+AI_BASE_URL = env("AI_BASE_URL", default="https://generativelanguage.googleapis.com/v1beta/models")
 AI_MODEL_NAME = env("AI_MODEL_NAME", default="gemini-3.5-flash")
 AI_MAX_PROMPT_CHARS = env.int("AI_MAX_PROMPT_CHARS", default=500000)
 
@@ -318,6 +322,14 @@ AI_MAX_PROMPT_CHARS = env.int("AI_MAX_PROMPT_CHARS", default=500000)
 # Media (Uploads)
 # ──────────────────────────────────────────────
 MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
+
+# ──────────────────────────────────────────────
+# Upload limits (SEC-04)
+# ──────────────────────────────────────────────
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_REQUEST_BODY_SIZE = 12 * 1024 * 1024  # 12 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024  # 12 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 
 # ──────────────────────────────────────────────
 # Documents

@@ -85,3 +85,43 @@ class TestLogoutAPI:
 
         sub.refresh_from_db()
         assert sub.revoked_at is not None
+
+    def test_logout_by_other_user_or_anonymous_does_not_revoke_subscription(
+        self, api_client, user
+    ):
+        from apps.accounts.tests.factories import UserFactory
+        from apps.notifications.models import PushSubscription
+
+        user_b = UserFactory(email="user_b@example.com")
+        endpoint = "https://fcm.googleapis.com/fcm/send/device_user_a"
+        sub_a = PushSubscription.objects.create(
+            user=user,
+            endpoint=endpoint,
+            p256dh="key",
+            auth="auth",
+        )
+
+        # 1. Anonymous request (no cookie) with user A's endpoint
+        response = api_client.post(
+            self.url,
+            {"push_endpoint": endpoint},
+            format="json",
+            **self.get_headers(),
+        )
+        assert response.status_code == status.HTTP_205_RESET_CONTENT
+        sub_a.refresh_from_db()
+        assert sub_a.revoked_at is None
+
+        # 2. User B logs out with user A's endpoint
+        refresh_b = RefreshToken.for_user(user_b)
+        cookie_name = settings.AUTH_REFRESH_COOKIE_NAME
+        api_client.cookies[cookie_name] = str(refresh_b)
+        response2 = api_client.post(
+            self.url,
+            {"push_endpoint": endpoint},
+            format="json",
+            **self.get_headers(),
+        )
+        assert response2.status_code == status.HTTP_205_RESET_CONTENT
+        sub_a.refresh_from_db()
+        assert sub_a.revoked_at is None

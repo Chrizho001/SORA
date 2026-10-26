@@ -9,6 +9,7 @@ from apps.documents.serializers import DocumentSerializer, DocumentUploadSeriali
 
 class DocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_queryset(self):
         return Document.objects.filter(user=self.request.user)
@@ -19,19 +20,37 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return DocumentSerializer
 
     def get_throttles(self):
-        if self.action in ["create", "generate_flashcards"]:
+        if self.action in ["create", "generate_flashcards", "retry"]:
             self.throttle_scope = "ai_jobs"
         return super().get_throttles()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        document = serializer.save()
 
-        # Queue celery task
-        from apps.documents.tasks import process_document
+        from django.db import transaction
 
-        process_document.delay(str(document.id))
+        with transaction.atomic():
+            document = serializer.save()
+
+            def enqueue():
+                import logging
+
+                from apps.documents.tasks import process_document
+
+                logger = logging.getLogger(__name__)
+                try:
+                    process_document.delay(str(document.id))
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to enqueue document processing for %s: %s", document.id, exc
+                    )
+                    Document.objects.filter(id=document.id).update(
+                        status=Document.Status.FAILED,
+                        error_message="Failed to queue document processing.",
+                    )
+
+            transaction.on_commit(enqueue)
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED, headers=headers)
@@ -55,6 +74,33 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 {"document": ["Document summary must be completed before generating flashcards."]},
                 code="summary_not_ready",
             )
+
+        count = request.data.get("count", 10)
+        try:
+            count = int(count)
+            if count < 5 or count > 20:
+                raise ValueError()
+        except (TypeError, ValueError):
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(
+                {"count": ["Count must be an integer between 5 and 20."]},
+                code="invalid_count",
+            )
+
+        from apps.flashcards.models import Deck
+
+        deck = Deck.objects.filter(user=request.user, document=document).first()
+        if not deck:
+            title = document.original_name
+            if title.lower().endswith(".pdf"):
+                title = title[:-4]
+            base_title = title
+            counter = 1
+            while Deck.objects.filter(user=request.user, title__iexact=title).exists():
+                counter += 1
+                title = f"{base_title} ({counter})"
+            deck = Deck.objects.create(user=request.user, title=title, document=document)
 
         from datetime import timedelta
 
@@ -84,7 +130,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         from apps.flashcards.tasks import generate_flashcards_task
 
         try:
-            generate_flashcards_task.delay(str(document.id))
+            generate_flashcards_task.delay(str(deck.id), count=count)
         except Exception:
             Document.objects.filter(pk=document.pk).update(
                 flashcard_generation_status=Document.FlashcardGenerationStatus.FAILED,
@@ -92,35 +138,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
             )
             raise
 
-        return Response({"status": "Generating flashcards..."}, status=status.HTTP_202_ACCEPTED)
-
-    @action(detail=True, methods=["post"], url_path="start-quiz")
-    def start_quiz(self, request, pk=None):
-        document = self.get_object()
-
-        from apps.quizzes.serializers import QuizSessionSerializer
-        from apps.quizzes.services import start_quiz
-
-        session = start_quiz(user=request.user, document=document)
-        serializer = QuizSessionSerializer(session)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(
+            {"status": "GENERATING", "deck_id": str(deck.id)},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     @action(detail=True, methods=["post"], url_path="retry")
     def retry(self, request, pk=None):
         document = self.get_object()
-        if document.status == Document.Status.PROCESSING:
-            return Response(
-                {"detail": "Document is already being analyzed."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        from apps.documents.services import retry_document
 
-        document.status = Document.Status.PROCESSING
-        document.error_message = ""
-        document.save(update_fields=["status", "error_message"])
-
-        from apps.documents.tasks import process_document
-
-        process_document.delay(str(document.id))
+        retry_document(document)
         return Response(
             {"status": "Retrying document analysis..."},
             status=status.HTTP_202_ACCEPTED,

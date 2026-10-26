@@ -1,4 +1,7 @@
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from rest_framework import serializers
+
 from apps.tasks.models import Task
 
 
@@ -22,10 +25,21 @@ class TaskSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         return Task.objects.create(user=user, **validated_data)
 
+
 class TaskQuerySerializer(serializers.Serializer):
     is_completed = serializers.BooleanField(required=False)
     priority = serializers.ChoiceField(choices=Task.Priority.choices, required=False)
     date = serializers.DateField(required=False)
+    tz = serializers.CharField(required=False)
+
+    def validate_tz(self, value):
+        if not value:
+            return value
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise serializers.ValidationError("Invalid IANA timezone.")
+        return value
 
     def get_fields(self):
         fields = super().get_fields()

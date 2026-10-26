@@ -1,13 +1,24 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
+
 from apps.documents.models import Document
-from apps.flashcards.models import Flashcard
+from apps.flashcards.models import Deck, Flashcard
+
 
 class QuizSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_sessions")
-    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name="quiz_sessions")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_sessions"
+    )
+    deck = models.ForeignKey(
+        Deck, on_delete=models.SET_NULL, null=True, blank=True, related_name="quiz_sessions"
+    )
+    deck_title = models.CharField(max_length=120, default="", blank=True)
+    document = models.ForeignKey(
+        Document, on_delete=models.SET_NULL, null=True, blank=True, related_name="quiz_sessions"
+    )
     score = models.IntegerField(null=True, blank=True)
     total_questions = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -16,11 +27,12 @@ class QuizSession(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "document"]),
+            models.Index(fields=["user", "-created_at"]),
         ]
 
     def __str__(self):
-        return f"Quiz Session {self.id} for {self.document.original_name}"
+        return f"Quiz Session {self.id} for {self.deck_title or 'Deleted deck'}"
+
 
 class QuizQuestion(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -31,9 +43,10 @@ class QuizQuestion(models.Model):
     choices = models.JSONField()
     selected_choice = models.TextField(blank=True, null=True)
     is_correct = models.BooleanField(null=True, blank=True)
+    position = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        ordering = ["id"]
+        ordering = ["position"]
 
     def __str__(self):
-        return f"Question for session {self.session.id}"
+        return f"Question {self.position} for session {self.session.id}"

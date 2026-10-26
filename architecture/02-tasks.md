@@ -107,12 +107,13 @@ Response: 204 No Content
 - [x] Tasks are ordered by `due_at` (ascending) by default, with null `due_at` (to-dos) appearing at the end
 
 ### Group 4 — Reminders & timezone (added 2026-10-25)
-- [ ] Due-soon reminder sent once for a task due within 24 h; not for completed or far-future tasks
-- [ ] Changing `due_at` resets `reminder_sent_at`, so the reminder is sent again for the new time
-- [ ] Re-opening a completed task resets reminder flags
-- [ ] Overdue task gets exactly one `TASK_OVERDUE` notification
-- [ ] `?date=2026-10-25&tz=America/New_York` returns a task due at `2026-10-26T02:00Z` (22:00 local) and excludes one due at `2026-10-25T03:00Z`
-- [ ] Unknown `tz` → 400 `validation_error`
+- [x] Due-soon reminder sent once for a task due within 24 h; not for completed or far-future tasks
+- [x] Changing `due_at` resets `reminder_sent_at`, so the reminder is sent again for the new time
+- [x] Re-opening a completed task resets reminder flags
+- [x] Overdue task gets exactly one `TASK_OVERDUE` notification
+- [x] `?date=2026-10-25&tz=America/New_York` returns a task due at `2026-10-26T02:00Z` (22:00 local) and excludes one due at `2026-10-25T03:00Z`
+- [x] Unknown `tz` → 400 `validation_error`
+
 
 ## 8. Out of scope
 - Recurring tasks (v1).

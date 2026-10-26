@@ -4,7 +4,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.quizzes.models import QuizSession
-from apps.quizzes.serializers import QuizSessionSerializer, SubmitQuizSerializer
+from apps.quizzes.serializers import (
+    QuizSessionDetailSerializer,
+    QuizSessionListSerializer,
+    SubmitQuizSerializer,
+)
 from apps.quizzes.services import submit_quiz
 
 
@@ -14,16 +18,28 @@ class QuizSessionViewSet(
     viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
-    serializer_class = QuizSessionSerializer
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return QuizSessionListSerializer
+        return QuizSessionDetailSerializer
 
     def get_queryset(self):
-        return QuizSession.objects.filter(user=self.request.user)
+        qs = QuizSession.objects.filter(user=self.request.user)
+        if self.action in ("retrieve", "submit"):
+            qs = qs.prefetch_related("questions")
+        return qs
+
+    def get_throttles(self):
+        if self.action == "submit":
+            self.throttle_scope = "quiz_submit"
+        return super().get_throttles()
 
     @action(detail=True, methods=["post"], url_path="submit")
     def submit(self, request, pk=None):
         session = self.get_object()
 
-        serializer = SubmitQuizSerializer(data=request.data)
+        serializer = SubmitQuizSerializer(data=request.data, context={"session": session})
         serializer.is_valid(raise_exception=True)
         answers_data = serializer.validated_data.get("answers", [])
 

@@ -101,26 +101,26 @@ On any 400 the session stays unfinished.
 
 ## 7. Test plan (TDD)
 ### Group 1 — Start quiz
-- [ ] Deck with < 4 cards → 400 `not_enough_flashcards`
-- [ ] Deck with ≥ 4 cards but < 4 distinct answers → 400 `not_enough_flashcards`
-- [ ] Valid start → 201; `question_count` respected (default 10, capped at the eligible cards)
-- [ ] Each question has 4 **distinct** choices including the correct answer
-- [ ] Unfinished payload contains no `correct_answer`, `is_correct` or `flashcard`
-- [ ] Another user's deck → 404
+- [x] Deck with < 4 cards → 400 `not_enough_flashcards`
+- [x] Deck with ≥ 4 cards but < 4 distinct answers → 400 `not_enough_flashcards`
+- [x] Valid start → 201; `question_count` respected (default 10, capped at the eligible cards)
+- [x] Each question has 4 **distinct** choices including the correct answer
+- [x] Unfinished payload contains no `correct_answer`, `is_correct` or `flashcard`
+- [x] Another user's deck → 404
 
 ### Group 2 — Submit and grading
-- [ ] All correct → score = total; `finished_at` set; `QUIZ_GRADED` notification created
-- [ ] Duplicate `question_id` → 400 `duplicate_question`, session still unfinished
-- [ ] Foreign `question_id` → 400 `invalid_question`
-- [ ] `selected_choice` not in choices → 400 `invalid_choice`
-- [ ] Partial or empty submission → unanswered graded incorrect, score counts answered-correct only
-- [ ] Second submit → 409 `quiz_already_finished`
-- [ ] Finished session GET reveals `correct_answer` and `is_correct`
+- [x] All correct → score = total; `finished_at` set; `QUIZ_GRADED` notification created
+- [x] Duplicate `question_id` → 400 `duplicate_question`, session still unfinished
+- [x] Foreign `question_id` → 400 `invalid_question`
+- [x] `selected_choice` not in choices → 400 `invalid_choice`
+- [x] Partial or empty submission → unanswered graded incorrect, score counts answered-correct only
+- [x] Second submit → 409 `quiz_already_finished`
+- [x] Finished session GET reveals `correct_answer` and `is_correct`
 
 ### Group 3 — History and performance
-- [ ] List is lightweight (no questions) and uses a constant number of queries for 1 vs 5 sessions
-- [ ] Deleting the deck keeps the session (deck NULL, `deck_title` kept)
-- [ ] Editing a card after a quiz doesn't change that quiz's `question_text` or `correct_answer`
+- [x] List is lightweight (no questions) and uses a constant number of queries for 1 vs 5 sessions
+- [x] Deleting the deck keeps the session (deck NULL, `deck_title` kept)
+- [x] Editing a card after a quiz doesn't change that quiz's `question_text` or `correct_answer`
 
 ## 8. Out of scope
 - Saving progress midway (submissions are all-at-once; the client keeps answers in memory).
