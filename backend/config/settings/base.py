@@ -22,9 +22,10 @@ env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
 )
-# Read .env only if it exists (CI and prod inject env vars directly)
+# Read .env only if it exists (CI and prod inject env vars directly).
+# DJANGO_READ_DOT_ENV=0 skips it so a stray .env never leaks into a deployed container.
 _env_file = BASE_DIR / ".env"
-if _env_file.is_file():
+if _env_file.is_file() and os.environ.get("DJANGO_READ_DOT_ENV", "1") != "0":
     env.read_env(str(_env_file))
 
 # ──────────────────────────────────────────────

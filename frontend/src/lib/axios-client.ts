@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1/auth";
+  process.env.NEXT_PUBLIC_API_URL || "/api/v1/auth";
 
 /**
  * Custom Error Class for Auth API
@@ -197,7 +197,7 @@ authClient.interceptors.response.use(
 );
 
 export const BACKEND_API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8000/api/v1";
+  process.env.NEXT_PUBLIC_BACKEND_API_URL || "/api/v1";
 
 /**
  * General API Client for SORA Backend (Documents, Flashcards, Quizzes, Tasks, Notifications)

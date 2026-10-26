@@ -25,3 +25,8 @@ pypdf>=6.19,<7.0
 # Push Notifications
 pywebpush>=2.0,<3.0
 
+
+# Deployment (DEP-01): WSGI server for the api container, and static files (Django admin) served
+# by the app itself because the API has no CDN or separate static host.
+gunicorn>=23.0,<27.0
+whitenoise>=6.7,<7.0

@@ -108,11 +108,11 @@ frontend/src/
 ## Deployment (decided 2026-10-25)
 - **One public HTTPS origin.** Next.js (`next start`) serves the PWA and rewrites `/api/v1/*` to Django
   (`gunicorn config.wsgi`) on the private network. The refresh cookie is therefore first-party.
-  Django usually sits behind 2 proxies (platform edge + Next.js). Set `NUM_PROXIES` to the real count,
-  and verify it after deploying by logging `X-Forwarded-For` once. Too low means all users share a
-  throttle bucket; too high lets clients spoof their IP.
-- Processes: `web` (Next.js), `api` (gunicorn), `worker` (`celery -A config worker`), `beat`
-  (`celery -A config beat`), managed Postgres 16, managed Redis 7.
+  Next.js rewrites pass `X-Forwarded-For` through without appending, so only the platform edge counts:
+  `NUM_PROXIES=1` on Railway (measured 2026-10-26). Verify it after deploying by logging
+  `X-Forwarded-For` once. Too low means all users share a throttle bucket; too high lets clients spoof their IP.
+- Processes on Railway: `web` (Next.js) and `api` (one container: gunicorn + `celery worker --beat`, sharing
+  the `/app/media` volume), plus managed Postgres and Redis.
 - Settings: `config.settings.prod` (`DEBUG=False`). `config.settings.dev` is **never** exposed publicly.
 - Details: `docs/deployment.md`.
 

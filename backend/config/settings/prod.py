@@ -31,8 +31,19 @@ FRONTEND_URL = env("FRONTEND_URL")
 CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
 AUTH_COOKIE_SECURE = True
 
-# Number of reverse proxies in front of Django for correct client IP resolution in rate limiting
+# Number of reverse proxies in front of Django for correct client IP resolution in rate limiting.
+# On Railway: platform edge + Next.js rewrite = 2 (docs/deployment.md, SEC-03).
 REST_FRAMEWORK["NUM_PROXIES"] = env.int("NUM_PROXIES", default=1)
+
+# Static files (Django admin) served by the app itself (DEP-01); collectstatic runs at image build.
+MIDDLEWARE.insert(
+    MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1,
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+)
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = env("EMAIL_HOST")
