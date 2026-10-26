@@ -631,7 +631,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
 
 ## 7. Deployment
 
-- [ ] **DEP-01 · P0 · Deploy over HTTPS so the app can be installed on a phone (Definition of Complete)**
+- [x] **DEP-01 · P0 · Deploy over HTTPS so the app can be installed on a phone (Definition of Complete)**
   - **Acceptable solution:** run these on a PaaS such as Render or Railway, all on one origin through the
     Next.js rewrite (FE-23):
     - frontend (`next start`)
@@ -646,7 +646,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
   - **Note (2026-10-26):** live at https://sora-study-nine.vercel.app (Vercel) + Render free API,
     Postgres, Key Value; Brevo email. Server-side smoke test passed (sign-up email, verify, login,
     reload, tasks, Gemini PDF summary in 11 s, AI cards appended, quiz graded, logout). `NUM_PROXIES=3`
-    measured (`docs/deployment.md` §4). **Remaining:** install on a phone and airplane-mode check.
+    measured (`docs/deployment.md` §4). Installed on a phone; opens in airplane mode (verified by the user).
 
 - [x] **DEP-02 · P0 (guard rail) · Never expose `config.settings.dev` publicly**
   - **Problem:** the abandoned ngrok setup served `DEBUG=True`, `ALLOWED_HOSTS=["*"]`, CORS open to all
