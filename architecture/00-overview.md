@@ -113,8 +113,9 @@ frontend/src/
   disk for uploaded PDFs), Render Postgres and Render Key Value (Redis). Blueprint: `render.yaml`.
 - **Email:** Brevo's HTTPS API via `django-anymail` (`BREVO_API_KEY`), because Render's free tier blocks
   outbound SMTP. `prod` refuses to start without `BREVO_API_KEY` or `EMAIL_HOST`.
-- `NUM_PROXIES`: two platforms sit in front of Django; measure it from the `xff=` field in the API access
-  log after deploying (`docs/deployment.md` §4). A self-hosted Next.js rewrite adds no entry (measured).
+- `NUM_PROXIES=3` (measured on the live deploy, `docs/deployment.md` §4): Vercel forwards a forged
+  `X-Forwarded-For`, so Django trusts only the Vercel egress / direct caller entry. Site users share
+  anonymous auth throttle buckets per Vercel egress IP until a `proxy.ts` client-IP header is added.
 - Admin: django-unfold theme with an operations dashboard (`config/admin_dashboard.py`,
   `templates/admin/index.html`), reachable only on the Render URL at `ADMIN_URL`.
 - Settings: `config.settings.prod` (`DEBUG=False`). `config.settings.demo` = prod + two flags for a laptop

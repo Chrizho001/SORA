@@ -131,9 +131,23 @@ The API's access log prints every request's `X-Forwarded-For` as `xff="…"`:
    76.76.21.9"` with your IP `198.51.100.7` → `NUM_PROXIES=2`.
 4. Set it on Render and record the value here.
 
-Measured locally on 2026-10-26: a self-hosted Next.js rewrite passes `X-Forwarded-For` through without
-appending. Vercel's edge and Render's edge may each append, so the expected value is `1` or `2`. Record the
-measured value here once deployed.
+**Measured on the live deploy (2026-10-26)**, from the `xff=` field in the Render access log:
+
+| Request | `X-Forwarded-For` reaching Django |
+|---|---|
+| Browser → Vercel → Render | `<client>, <Vercel egress>, <Cloudflare>, <Render LB>` (4 entries) |
+| Same, with a forged `X-Forwarded-For: 6.6.6.6` | `6.6.6.6, <Vercel egress>, <Cloudflare>, <Render LB>`: **Vercel forwards the forged value** and drops the real client IP |
+| Direct to the Render URL | `<client>, <Cloudflare>, <Render LB>` (3 entries; a forged value is prepended) |
+
+**Decision: `NUM_PROXIES=3`.** Django then reads the rightmost entry it can trust: the Vercel egress IP for
+site traffic and the real caller for direct Render traffic. Neither can be forged. `4` would identify site
+users individually but would let anyone choose their own IP by sending a forged header.
+
+**Known limitation:** site users share anonymous throttle buckets (login 5/min, register 10/hour, email
+5/hour) per Vercel egress IP. Vercel rotates a pool of egress IPs and the limits only cover unauthenticated
+auth endpoints (AI and quiz limits are per user), so this does not affect demo-scale use.
+**Proper fix (after submission):** a Next.js middleware (`proxy.ts`) that forwards the client IP Vercel
+records for the request, plus a shared secret header so Django only trusts it when it came from Vercel.
 
 ---
 
