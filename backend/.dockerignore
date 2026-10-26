@@ -11,3 +11,4 @@ htmlcov/
 media/
 staticfiles/
 celerybeat-schedule*
+logs/

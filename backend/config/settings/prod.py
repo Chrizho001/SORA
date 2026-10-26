@@ -20,6 +20,11 @@ if not GOOGLE_CLIENT_ID:
 
 
 DEBUG = False
+
+# Render injects the service's own hostname; the Vercel rewrite proxies with that Host header.
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, RENDER_EXTERNAL_HOSTNAME]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 31536000
@@ -45,8 +50,18 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = env("EMAIL_HOST")
+# Email: Brevo's HTTPS API when BREVO_API_KEY is set (Render's free tier blocks outbound SMTP),
+# otherwise plain SMTP. One of the two is required.
+BREVO_API_KEY = env("BREVO_API_KEY", default="")
+EMAIL_HOST = env("EMAIL_HOST", default="")
+if BREVO_API_KEY:
+    INSTALLED_APPS.append("anymail")
+    EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+    ANYMAIL = {"BREVO_API_KEY": BREVO_API_KEY}
+elif EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    raise ImproperlyConfigured("Set BREVO_API_KEY or EMAIL_HOST for production email.")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")

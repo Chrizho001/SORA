@@ -105,16 +105,20 @@ frontend/src/
 - **Background jobs:** enqueue in `transaction.on_commit`. Tasks are idempotent (`acks_late=True`) and
   have time limits (`CELERY_TASK_TIME_LIMIT=300`).
 
-## Deployment (decided 2026-10-25)
-- **One public HTTPS origin.** Next.js (`next start`) serves the PWA and rewrites `/api/v1/*` to Django
-  (`gunicorn config.wsgi`) on the private network. The refresh cookie is therefore first-party.
-  Next.js rewrites pass `X-Forwarded-For` through without appending, so only the platform edge counts:
-  `NUM_PROXIES=1` on Railway (measured 2026-10-26). Verify it after deploying by logging
-  `X-Forwarded-For` once. Too low means all users share a throttle bucket; too high lets clients spoof their IP.
-- Processes on Railway: `web` (Next.js) and `api` (one container: gunicorn + `celery worker --beat`, sharing
-  the `/app/media` volume), plus managed Postgres and Redis.
-- Settings: `config.settings.prod` (`DEBUG=False`). `config.settings.dev` is **never** exposed publicly.
-- Details: `docs/deployment.md`.
+## Deployment (updated 2026-10-26: Vercel + Render free tiers)
+- **One public HTTPS origin: Vercel.** Vercel serves the Next.js PWA and rewrites `/api/v1/*` to the Django
+  API on Render (`https://sora-api.onrender.com`). The browser never calls Render directly, so the refresh
+  cookie is first-party on the Vercel domain.
+- **Render (free):** one Docker web service running gunicorn + `celery worker --beat` (they share the local
+  disk for uploaded PDFs), Render Postgres and Render Key Value (Redis). Blueprint: `render.yaml`.
+- **Email:** Brevo's HTTPS API via `django-anymail` (`BREVO_API_KEY`), because Render's free tier blocks
+  outbound SMTP. `prod` refuses to start without `BREVO_API_KEY` or `EMAIL_HOST`.
+- `NUM_PROXIES`: two platforms sit in front of Django; measure it from the `xff=` field in the API access
+  log after deploying (`docs/deployment.md` §4). A self-hosted Next.js rewrite adds no entry (measured).
+- Settings: `config.settings.prod` (`DEBUG=False`). `config.settings.demo` = prod + two flags for a laptop
+  tunnel fallback. `config.settings.dev` is **never** exposed publicly.
+- Free-tier trade-offs (sleep after 15 min, temporary PDF storage, 30-day Postgres) and the full checklist:
+  `docs/deployment.md`.
 
 ## Spec template (use for every system)
 ```

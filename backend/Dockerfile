@@ -14,5 +14,5 @@ RUN pip install --no-cache-dir -r requirements/base.txt
 COPY . /app/
 RUN mkdir -p /app/media
 
-# docker-compose overrides this per service (worker / beat); Railway uses it as-is.
+# docker-compose overrides this per service (worker / beat); Render uses it as-is.
 CMD ["bash", "deploy/start.sh"]

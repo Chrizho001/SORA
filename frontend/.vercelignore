@@ -1,0 +1,6 @@
+# Never upload local env files or build output with `vercel` CLI deploys; Vercel env vars are the source.
+.env
+.env*.local
+.next
+node_modules
+public/sw.js*

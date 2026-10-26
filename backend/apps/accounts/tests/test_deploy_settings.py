@@ -42,11 +42,12 @@ print(json.dumps({
     "STATIC_ROOT": str(settings.STATIC_ROOT),
     "STATICFILES_BACKEND": settings.STORAGES["staticfiles"]["BACKEND"],
     "NUM_PROXIES": settings.REST_FRAMEWORK.get("NUM_PROXIES"),
+    "ANYMAIL_HAS_BREVO_KEY": bool(getattr(settings, "ANYMAIL", {}).get("BREVO_API_KEY")),
 }))
 """
 
 
-def load_settings(module, **extra_env):
+def run_settings(module, drop=(), **extra_env):
     env = {
         "PATH": os.environ.get("PATH", ""),
         "DJANGO_SETTINGS_MODULE": module,
@@ -55,13 +56,19 @@ def load_settings(module, **extra_env):
         **BASE_ENV,
         **extra_env,
     }
-    proc = subprocess.run(
+    for key in drop:
+        env.pop(key, None)
+    return subprocess.run(
         [sys.executable, "-c", "import django; django.setup()\n" + DUMP],
         env=env,
         cwd=BACKEND_DIR,
         capture_output=True,
         text=True,
     )
+
+
+def load_settings(module, drop=(), **extra_env):
+    proc = run_settings(module, drop, **extra_env)
     assert proc.returncode == 0, proc.stderr
     return json.loads(proc.stdout.strip().splitlines()[-1])
 
@@ -113,3 +120,40 @@ class TestProdSettings:
         assert s["AUTH_COOKIE_PATH"] == "/api/v1/auth/"
         assert s["AUTH_COOKIE_SECURE"] is True
         assert s["DEBUG"] is False
+
+
+class TestProdEmailSettings:
+    def test_prod_uses_brevo_api_when_key_set(self):
+        # Render's free tier blocks outbound SMTP, so production sends over Brevo's HTTPS API.
+        s = load_settings(
+            "config.settings.prod", drop=("EMAIL_HOST",), BREVO_API_KEY="xkeysib-test"
+        )
+        assert s["EMAIL_BACKEND"] == "anymail.backends.brevo.EmailBackend"
+        assert s["ANYMAIL_HAS_BREVO_KEY"] is True
+
+    def test_prod_uses_smtp_when_only_email_host_set(self):
+        s = load_settings("config.settings.prod")
+        assert s["EMAIL_BACKEND"] == "django.core.mail.backends.smtp.EmailBackend"
+
+    def test_prod_refuses_to_start_without_any_email_transport(self):
+        proc = run_settings("config.settings.prod", drop=("EMAIL_HOST",))
+        assert proc.returncode != 0
+        assert "BREVO_API_KEY or EMAIL_HOST" in proc.stderr
+
+    def test_demo_console_email_still_overrides_brevo(self):
+        s = load_settings(
+            "config.settings.demo", drop=("EMAIL_HOST",), BREVO_API_KEY="k", DEMO_CONSOLE_EMAIL="1"
+        )
+        assert s["EMAIL_BACKEND"] == "django.core.mail.backends.console.EmailBackend"
+
+
+class TestRenderHost:
+    def test_prod_trusts_render_external_hostname(self):
+        # Render sets RENDER_EXTERNAL_HOSTNAME; the Vercel proxy sends that Host to Django.
+        s = load_settings("config.settings.prod", RENDER_EXTERNAL_HOSTNAME="sora-api.onrender.com")
+        assert "sora-api.onrender.com" in s["ALLOWED_HOSTS"]
+        assert "*" not in s["ALLOWED_HOSTS"]
+
+    def test_prod_hosts_unchanged_off_render(self):
+        s = load_settings("config.settings.prod")
+        assert s["ALLOWED_HOSTS"] == ["sora.example.com", "api.railway.internal"]

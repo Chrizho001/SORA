@@ -30,3 +30,5 @@ pywebpush>=2.0,<3.0
 # by the app itself because the API has no CDN or separate static host.
 gunicorn>=23.0,<27.0
 whitenoise>=6.7,<7.0
+# Production email over Brevo's HTTPS API: Render's free tier blocks outbound SMTP ports.
+django-anymail[brevo]>=13.0,<16.0
