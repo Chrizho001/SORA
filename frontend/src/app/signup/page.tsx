@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useTransition, Suspense } from "react";
+import React, { useState, useEffect, useTransition, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthCardLayout } from "@/components/auth/AuthCardLayout";
 import { AuthInput } from "@/components/auth/AuthInput";
 import { AuthButton } from "@/components/auth/AuthButton";
@@ -11,14 +11,28 @@ import { MascotEmotion } from "@/components/auth/SoraMascot";
 import { notify } from "@/components/auth/ToastProvider";
 import { registerSchema, RegisterFormData } from "@/lib/auth-schemas";
 import { authApi, AuthApiError } from "@/lib/auth-api";
+import { useAuth } from "@/lib/auth-context";
 import { Check, ShieldCheck } from "lucide-react";
 
 function SignupForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const rawNext = searchParams?.get("next");
+  const { user, isLoading } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
+
+  // Redirect logged-in users away to /dashboard
+  useEffect(() => {
+    if (!isLoading && user) {
+      const targetUrl =
+        rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("\\")
+          ? rawNext
+          : "/dashboard";
+      router.replace(targetUrl);
+    }
+  }, [user, isLoading, router, rawNext]);
 
   // Form State
   const [formData, setFormData] = useState<RegisterFormData>({
@@ -257,7 +271,7 @@ function SignupForm() {
       }}
       secondaryLink={{
         label: "Privacy Policy",
-        href: "#",
+        href: "/privacy",
       }}
     >
       <div className="space-y-4">

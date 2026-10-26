@@ -505,7 +505,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `SECURITY_EMAIL_CHANGED`) to an icon, a label and a deep link built from `data`.
   - **Prompt:** P-16
 
-- [ ] **FE-11 · P1 · Modals and the upload control are not accessible**
+- [x] **FE-11 · P1 · Modals and the upload control are not accessible**
   - **Where:** `TaskModal.tsx`, `DocumentUploadModal.tsx` (clickable `div` with a `hidden` input), the
     summary reader in `DocumentsView.tsx`, `NotificationDrawer.tsx`; close buttons have no `aria-label`.
   - **Acceptable solution:** one shared `<Dialog>` primitive with `role="dialog"`, `aria-modal`,
@@ -513,7 +513,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     upload control is a `<label>` wrapping an `sr-only` file input.
   - **Prompt:** P-17
 
-- [ ] **FE-12 · P1 · Google sign-in clicks a hidden Google button from code**
+- [x] **FE-12 · P1 · Google sign-in clicks a hidden Google button from code**
   - **Where:** `frontend/src/components/auth/GoogleAuthButton.tsx`.
   - **Problem:** the real clickable element is inside Google's cross-origin iframe, so `.click()` is
     unreliable.
@@ -547,7 +547,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     every task row and calendar item.
   - **Prompt:** P-14
 
-- [ ] **FE-16 · P1 · Destructive actions have no confirmation**
+- [x] **FE-16 · P1 · Destructive actions have no confirmation**
   - **Where:** document delete (cascades to flashcards and quizzes), task delete, and deck and card delete.
   - **Acceptable solution:** a shared confirm dialog naming what will be lost.
   - **Prompt:** P-17
@@ -574,7 +574,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
   - **Acceptable solution:** when the unread count changes, invalidate `["notifications"]`.
   - **Prompt:** P-16
 
-- [ ] **FE-19 · P2 · Double toasts and dead catch blocks**
+- [x] **FE-19 · P2 · Double toasts and dead catch blocks**
   - **Where:** mutation `onError` toasts plus inline modal errors; the protected-route effect fires
     "Authentication Required" after a normal logout; the dead `catch` in `handleLogout`.
   - **Acceptable solution:** one error surface per action, and no auth toast after a voluntary logout.
@@ -587,7 +587,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     expected — Retry" state. Set the upload timeout to 120 s and show upload progress (`onUploadProgress`).
   - **Prompt:** P-16
 
-- [ ] **FE-21 · P2 · Polish and dead code**
+- [x] **FE-21 · P2 · Polish and dead code**
   - `error.tsx` and `not-found.tsx` are missing.
   - Footer links `/privacy`, `/terms` and `/cookies` return 404; signup "Privacy Policy" is `href="#"`.
   - "Remember me" does nothing.

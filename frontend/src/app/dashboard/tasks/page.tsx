@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { notify } from "@/components/auth/ToastProvider";
-import { formatApiErrorMessage } from "@/lib/axios-client";
 import { TaskModal } from "@/components/dashboard/TaskModal";
 import { TasksView } from "@/components/dashboard/views/TasksView";
 import {
@@ -30,13 +28,9 @@ export default function TasksPage() {
   };
 
   const handleCreateTask = async (payload: CreateTaskPayload) => {
-    try {
-      await createTaskMutation.mutateAsync(payload);
-      setIsTaskModalOpen(false);
-      setEditingTask(null);
-    } catch (err: unknown) {
-      notify.error(formatApiErrorMessage(err), "Failed to Create Task");
-    }
+    await createTaskMutation.mutateAsync(payload);
+    setIsTaskModalOpen(false);
+    setEditingTask(null);
   };
 
   const handleEditTask = (task: TaskItem) => {
@@ -45,13 +39,9 @@ export default function TasksPage() {
   };
 
   const handleUpdateTask = async (id: string, payload: Partial<CreateTaskPayload>) => {
-    try {
-      await updateTaskMutation.mutateAsync({ id, payload });
-      setIsTaskModalOpen(false);
-      setEditingTask(null);
-    } catch (err: unknown) {
-      notify.error(formatApiErrorMessage(err), "Failed to Update Task");
-    }
+    await updateTaskMutation.mutateAsync({ id, payload });
+    setIsTaskModalOpen(false);
+    setEditingTask(null);
   };
 
   return (

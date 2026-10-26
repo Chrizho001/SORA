@@ -14,8 +14,8 @@ import { registerSessionExpiredHandler } from "./axios-client";
 
 interface AuthContextType {
   user: User | null;
-  accessToken: string | null;
   isLoading: boolean;
+  isLoggingOut: boolean;
   login: (access: string, user: User) => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<boolean>;
@@ -28,10 +28,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 let initialRefresh: Promise<{ user: User | null; access: string | null }> | null = null;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Access token is held in-memory ONLY as required by architecture/01-authentication.md
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
 
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -40,7 +39,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     registerSessionExpiredHandler(() => {
       setUser(null);
-      setAccessToken(null);
       queryClient.clear();
       initialRefresh = null;
       router.replace("/login?expired=1");
@@ -51,18 +49,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient, router]);
 
   const login = useCallback((access: string, userData: User) => {
-    setAccessToken(access);
     setUser(userData);
+    setIsLoggingOut(false);
     initialRefresh = Promise.resolve({ user: userData, access });
   }, []);
 
   const logout = useCallback(async () => {
+    setIsLoggingOut(true);
     try {
       await authApi.logout();
     } catch (err) {
       console.warn("Logout endpoint error:", err);
     } finally {
-      setAccessToken(null);
       setUser(null);
       queryClient.clear();
       initialRefresh = null;
@@ -76,13 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = useCallback(async (): Promise<boolean> => {
     try {
       const { access } = await authApi.refreshToken();
-      setAccessToken(access);
       // Fetch user profile with the newly minted access token
       const profile = await authApi.getMe(access);
       setUser(profile);
       return true;
     } catch {
-      setAccessToken(null);
       setUser(null);
       return false;
     }
@@ -107,7 +103,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initialRefresh
       .then((res) => {
         if (isMounted) {
-          setAccessToken(res.access);
           setUser(res.user);
         }
       })
@@ -126,8 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        accessToken,
         isLoading,
+        isLoggingOut,
         login,
         logout,
         refreshSession,

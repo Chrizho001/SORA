@@ -400,6 +400,7 @@ export function DeckDetailView({
                     disabled={updateDeckMutation.isPending}
                     className="size-10 rounded-xl bg-night hover:bg-ink text-[#c8f560] flex items-center justify-center shrink-0 transition-transform active:scale-95 disabled:opacity-50"
                     title="Save title (Enter)"
+                    aria-label="Save title"
                   >
                     <Check className="size-4" />
                   </button>
@@ -412,6 +413,7 @@ export function DeckDetailView({
                     }}
                     className="size-10 rounded-xl bg-canvas hover:bg-mist text-muted flex items-center justify-center shrink-0 transition-colors border border-line"
                     title="Cancel (Esc)"
+                    aria-label="Cancel editing"
                   >
                     <X className="size-4" />
                   </button>
@@ -433,6 +435,7 @@ export function DeckDetailView({
                   onClick={() => setIsEditingTitle(true)}
                   className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-mist transition-colors"
                   title="Rename deck"
+                  aria-label="Rename deck"
                 >
                   <Pencil className="size-4" />
                 </button>
@@ -877,9 +880,9 @@ export function DeckDetailView({
         onClose={() => setIsDeleteDeckOpen(false)}
         onConfirm={handleDeleteDeck}
         title="Delete Deck"
-        description={`Are you sure you want to delete "${deck.title}"? All ${cards.length} flashcards in this deck will be permanently removed. Past quiz history will be preserved.`}
+        description={`Deletes ${cards.length} cards. Quiz history is kept.`}
         confirmLabel="Delete Deck"
-        isDestructive
+        tone="danger"
         isLoading={deleteDeckMutation.isPending}
       />
 
@@ -1021,9 +1024,9 @@ export function DeckDetailView({
         onClose={() => setDeletingCard(null)}
         onConfirm={handleDeleteCard}
         title="Delete Flashcard"
-        description="Are you sure you want to delete this flashcard? This action cannot be undone."
+        description="Deletes this card permanently."
         confirmLabel="Delete Card"
-        isDestructive
+        tone="danger"
         isLoading={deleteFlashcardMutation.isPending}
       />
     </div>

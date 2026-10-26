@@ -70,6 +70,7 @@ export function MobileHeader({
             onClick={onLogout}
             className="size-8 rounded-full text-muted hover:text-rose-600 hover:bg-mist flex items-center justify-center"
             title="Log out"
+            aria-label="Log out"
           >
             <LogOut className="size-4" />
           </button>

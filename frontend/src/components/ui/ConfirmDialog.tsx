@@ -12,6 +12,7 @@ export interface ConfirmDialogProps {
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  tone?: "danger" | "default";
   isDestructive?: boolean;
   isLoading?: boolean;
 }
@@ -24,14 +25,17 @@ export function ConfirmDialog({
   description,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
-  isDestructive = false,
+  tone = "danger",
+  isDestructive,
   isLoading = false,
 }: ConfirmDialogProps) {
+  const isDanger = isDestructive !== undefined ? isDestructive : tone === "danger";
+
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-5">
         <div className="flex items-start gap-3">
-          {isDestructive && (
+          {isDanger && (
             <div className="size-9 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
               <AlertTriangle className="size-4" />
             </div>
@@ -55,7 +59,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={isLoading}
             className={`px-4 py-2 rounded-xl text-xs font-display font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 ${
-              isDestructive
+              isDanger
                 ? "bg-rose-600 hover:bg-rose-700 text-white"
                 : "bg-night hover:bg-ink text-[#c8f560]"
             }`}

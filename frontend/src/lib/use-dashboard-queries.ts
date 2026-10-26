@@ -95,10 +95,6 @@ export function useUploadDocument() {
         "Upload Started"
       );
     },
-    onError: (error: unknown) => {
-      const msg = formatApiErrorMessage(error);
-      notify.error(msg, "Upload Failed");
-    },
   });
 }
 
@@ -227,10 +223,6 @@ export function useCreateDeck() {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
       notify.success(`Deck "${newDeck.title}" created!`, "Deck Created");
     },
-    onError: (error: unknown) => {
-      const msg = formatApiErrorMessage(error);
-      notify.error(msg, "Failed to Create Deck");
-    },
   });
 }
 
@@ -249,10 +241,6 @@ export function useUpdateDeck() {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "deck", updatedDeck.id) });
       notify.success("Deck updated.", "Deck Saved");
-    },
-    onError: (error: unknown) => {
-      const msg = formatApiErrorMessage(error);
-      notify.error(msg, "Failed to Update Deck");
     },
   });
 }
@@ -474,10 +462,6 @@ export function useCreateTask() {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "tasks") });
       notify.success("New study task scheduled!", "Task Created");
     },
-    onError: (error: unknown) => {
-      const msg = formatApiErrorMessage(error);
-      notify.error(msg, "Task Creation Failed");
-    },
   });
 }
 
@@ -489,10 +473,6 @@ export function useUpdateTask() {
       tasksApi.updateTask(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk(user?.id, "tasks") });
-    },
-    onError: (error: unknown) => {
-      const msg = formatApiErrorMessage(error);
-      notify.error(msg, "Task Update Failed");
     },
   });
 }

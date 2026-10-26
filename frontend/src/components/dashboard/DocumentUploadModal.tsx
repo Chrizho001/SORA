@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
-  X,
   UploadCloud,
   FileText,
   AlertCircle,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import { SoraMascot } from "@/components/auth/SoraMascot";
 import { formatApiErrorMessage } from "@/lib/axios-client";
+import { Dialog } from "@/components/ui/Dialog";
 
 interface DocumentUploadModalProps {
   isOpen: boolean;
@@ -25,14 +25,11 @@ export function DocumentUploadModal({
   onClose,
   onUpload,
 }: DocumentUploadModalProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
 
   const validateAndSetFile = (file: File) => {
     setError(null);
@@ -101,32 +98,28 @@ export function DocumentUploadModal({
     }
   };
 
+  const handleClose = () => {
+    if (!isUploading) {
+      setSelectedFile(null);
+      setError(null);
+      setUploadProgress(0);
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-3xl bg-surface border border-line p-6 shadow-2xl text-ink space-y-5">
-        {/* Header */}
-        <div className="flex items-start justify-between pb-3 border-b border-line">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-2xl bg-[#c8f560] text-[#141413] flex items-center justify-center font-bold">
-              <UploadCloud className="size-5" />
-            </div>
-            <div>
-              <h3 className="font-display font-bold text-lg text-ink">Upload Lecture PDF</h3>
-              <p className="text-xs text-muted font-body">
-                Multimodal AI analysis for lecture slides, notes, diagrams, and readings
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="size-8 rounded-full text-muted hover:bg-mist hover:text-ink flex items-center justify-center transition-colors"
-          >
-            <X className="size-4" />
-          </button>
+    <Dialog
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Upload Lecture PDF"
+      description="Multimodal AI analysis for lecture slides, notes, diagrams, and readings"
+      headerPrefix={
+        <div className="size-10 rounded-2xl bg-[#c8f560] text-[#141413] flex items-center justify-center font-bold shrink-0">
+          <UploadCloud className="size-5" />
         </div>
-
+      }
+    >
+      <div className="space-y-5">
         {/* Mascot Helper Note */}
         <div className="flex items-center gap-3 p-3 rounded-2xl bg-canvas border border-line">
           <SoraMascot
@@ -164,13 +157,13 @@ export function DocumentUploadModal({
           </div>
         )}
 
-        {/* Drag and Drop Zone */}
-        <div
+        {/* Accessible Drag and Drop Zone with <label htmlFor="pdf-input"> and <input id="pdf-input" ... className="sr-only"> */}
+        <label
+          htmlFor="pdf-input"
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => !isUploading && fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center space-y-3 ${
+          className={`block border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center space-y-3 ${
             isDragging
               ? "border-[#c8f560] bg-[#c8f560]/10 scale-[1.01]"
               : selectedFile
@@ -179,12 +172,12 @@ export function DocumentUploadModal({
           } ${isUploading ? "pointer-events-none opacity-80" : ""}`}
         >
           <input
-            ref={fileInputRef}
+            id="pdf-input"
             type="file"
-            accept=".pdf,application/pdf"
+            accept="application/pdf"
             onChange={handleFileChange}
             disabled={isUploading}
-            className="hidden"
+            className="sr-only"
           />
 
           {selectedFile ? (
@@ -222,7 +215,7 @@ export function DocumentUploadModal({
               </span>
             </>
           )}
-        </div>
+        </label>
 
         {/* Upload Progress Bar (FE-20) */}
         {isUploading && (
@@ -268,7 +261,7 @@ export function DocumentUploadModal({
           <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isUploading}
               className="px-4 py-2.5 rounded-xl border border-line text-xs font-display font-semibold text-muted hover:text-ink hover:bg-mist transition-colors disabled:opacity-50"
             >
@@ -286,6 +279,6 @@ export function DocumentUploadModal({
           </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -22,8 +22,7 @@ function DashboardLayoutContent({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isLoading, logout } = useAuth();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { user, isLoading, logout, isLoggingOut } = useAuth();
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
 
   // Protected route check
@@ -48,15 +47,9 @@ function DashboardLayoutContent({
 
   // Logout handler
   const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await logout();
-      notify.success("You have been signed out successfully.", "Logged Out");
-      router.replace("/login");
-    } catch {
-      notify.error("An error occurred during logout.", "Logout Error");
-      setIsLoggingOut(false);
-    }
+    await logout();
+    notify.success("You have been signed out successfully.", "Logged Out");
+    router.replace("/login");
   };
 
   // While isLoading or no user, show full-screen skeleton; NEVER render children before auth resolves
