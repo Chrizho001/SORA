@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   FileText,
   Plus,
@@ -15,13 +16,14 @@ import {
   RotateCw,
   Sparkles,
 } from "lucide-react";
-import { DocumentItem } from "@/lib/dashboard-api";
+import { DocumentItem, Deck } from "@/lib/dashboard-api";
 import { MascotGuide } from "../MascotGuide";
 import { FormattedSummary, stripMarkdown } from "../FormattedSummary";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 interface DocumentsViewProps {
   documents?: DocumentItem[];
+  decks?: Deck[];
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
@@ -34,6 +36,7 @@ interface DocumentsViewProps {
 
 export function DocumentsView({
   documents,
+  decks,
   isLoading,
   isError,
   onRetry,
@@ -167,9 +170,12 @@ export function DocumentsView({
             const isDone = doc.status === "DONE";
             const isProcessing = doc.status === "PROCESSING" || doc.status === "UPLOADED";
             const isFailed = doc.status === "FAILED";
-            const hasFlashcards = doc.flashcard_generation_status === "DONE";
             const isFlashcardsGenerating = doc.flashcard_generation_status === "GENERATING";
             const isFlashcardsFailed = doc.flashcard_generation_status === "FAILED";
+            const linkedDeck = (decks ?? []).find((d) => d.document === doc.id);
+            const hasFlashcards =
+              doc.flashcard_generation_status === "DONE" ||
+              (linkedDeck !== undefined && linkedDeck.card_count > 0);
             const now = currentTime || 0;
             const startTime = doc.processing_started_at
               ? new Date(doc.processing_started_at).getTime()
@@ -234,11 +240,24 @@ export function DocumentsView({
                           Analysis Failed
                         </span>
                       )}
-                      {hasFlashcards && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-[0.6875rem] font-display font-semibold">
-                          5 Flashcards
-                        </span>
-                      )}
+                      {linkedDeck ? (
+                        <Link
+                          href={`/dashboard/flashcards/${linkedDeck.id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-[0.6875rem] font-display font-semibold transition-colors"
+                          title="View flashcard deck"
+                        >
+                          <Brain className="size-3" />
+                          <span>Deck ({linkedDeck.card_count})</span>
+                        </Link>
+                      ) : hasFlashcards ? (
+                        <Link
+                          href="/dashboard/flashcards"
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-[0.6875rem] font-display font-semibold transition-colors"
+                        >
+                          <Brain className="size-3" />
+                          <span>Flashcards Deck</span>
+                        </Link>
+                      ) : null}
                       {isFlashcardsFailed && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[0.6875rem] font-display font-semibold">
                           Flashcards Issue
@@ -348,7 +367,15 @@ export function DocumentsView({
                     </button>
                   )}
 
-                  {isDone && !hasFlashcards && (
+                  {linkedDeck ? (
+                    <Link
+                      href={`/dashboard/flashcards/${linkedDeck.id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-display font-semibold hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <Brain className="size-3.5 text-purple-600" />
+                      <span>Flashcards ({linkedDeck.card_count})</span>
+                    </Link>
+                  ) : isDone && (
                     <button
                       type="button"
                       onClick={() => onGenerateFlashcards(doc.id)}

@@ -131,8 +131,12 @@ export const documentsApi = {
     await apiClient.delete(`/documents/${id}/`);
   },
 
-  async generateFlashcards(documentId: string): Promise<{ status: string }> {
-    const res = await apiClient.post<{ status: string }>(`/documents/${documentId}/generate-flashcards/`);
+  async generateFlashcards(
+    documentId: string
+  ): Promise<{ status: string; deck_id?: string }> {
+    const res = await apiClient.post<{ status: string; deck_id?: string }>(
+      `/documents/${documentId}/generate-flashcards/`
+    );
     return res.data;
   },
 
@@ -151,7 +155,7 @@ export const documentsApi = {
 // DECKS & FLASHCARDS TYPES & API
 // ==========================================
 
-export interface DeckItem {
+export interface Deck {
   id: string;
   title: string;
   description: string;
@@ -161,10 +165,11 @@ export interface DeckItem {
   created_at: string;
   updated_at: string;
 }
+export type DeckItem = Deck;
 
 export const decksApi = {
-  async getDecks(params?: { document?: string }): Promise<DeckItem[]> {
-    const { results } = await fetchAllPages<DeckItem>(
+  async list(params?: { document?: string }): Promise<Deck[]> {
+    const { results } = await fetchAllPages<Deck>(
       apiClient,
       "/decks/",
       params as Record<string, unknown>
@@ -172,72 +177,125 @@ export const decksApi = {
     return results;
   },
 
-  async getDeck(id: string): Promise<DeckItem> {
-    const res = await apiClient.get<DeckItem>(`/decks/${id}/`);
+  async get(id: string): Promise<Deck> {
+    const res = await apiClient.get<Deck>(`/decks/${id}/`);
     return res.data;
   },
 
-  async createDeck(payload: {
+  async create(payload: {
     title: string;
     description?: string;
     document?: string | null;
-  }): Promise<DeckItem> {
-    const res = await apiClient.post<DeckItem>("/decks/", payload);
+  }): Promise<Deck> {
+    const res = await apiClient.post<Deck>("/decks/", payload);
     return res.data;
   },
 
-  async updateDeck(
+  async update(
     id: string,
     payload: Partial<{ title: string; description: string }>
-  ): Promise<DeckItem> {
-    const res = await apiClient.patch<DeckItem>(`/decks/${id}/`, payload);
+  ): Promise<Deck> {
+    const res = await apiClient.patch<Deck>(`/decks/${id}/`, payload);
     return res.data;
   },
 
-  async deleteDeck(id: string): Promise<void> {
+  async remove(id: string): Promise<void> {
     await apiClient.delete(`/decks/${id}/`);
+  },
+
+  async generate(id: string, payload?: { count?: number }): Promise<{ status: string }> {
+    const res = await apiClient.post<{ status: string }>(
+      `/decks/${id}/generate-flashcards/`,
+      payload
+    );
+    return res.data;
+  },
+
+  async startQuiz(
+    id: string,
+    payload?: { question_count?: number }
+  ): Promise<QuizSession> {
+    const res = await apiClient.post<QuizSession>(
+      `/decks/${id}/start-quiz/`,
+      payload
+    );
+    return res.data;
+  },
+
+  // Aliases for backwards compatibility
+  getDecks(params?: { document?: string }) {
+    return this.list(params);
+  },
+  getDeck(id: string) {
+    return this.get(id);
+  },
+  createDeck(payload: { title: string; description?: string; document?: string | null }) {
+    return this.create(payload);
+  },
+  updateDeck(id: string, payload: Partial<{ title: string; description: string }>) {
+    return this.update(id, payload);
+  },
+  deleteDeck(id: string) {
+    return this.remove(id);
   },
 };
 
-export interface FlashcardItem {
+export interface Flashcard {
   id: string;
-  deck?: string;
-  document?: string;
+  deck: string;
+  document: string | null;
   question: string;
   answer: string;
-  source?: "MANUAL" | "AI";
+  source: "MANUAL" | "AI";
   created_at: string;
   updated_at: string;
 }
+export type FlashcardItem = Flashcard;
 
 export const flashcardsApi = {
-  async getFlashcards(
-    filter?: { document?: string; deck?: string } | string
-  ): Promise<FlashcardItem[]> {
-    const params: Record<string, unknown> =
-      typeof filter === "string"
-        ? { document: filter }
-        : filter
-        ? { ...filter }
-        : {};
-    const { results } = await fetchAllPages<FlashcardItem>(apiClient, "/flashcards/", params);
+  async list(params?: { deck?: string; document?: string }): Promise<Flashcard[]> {
+    const { results } = await fetchAllPages<Flashcard>(
+      apiClient,
+      "/flashcards/",
+      params as Record<string, unknown>
+    );
     return results;
   },
 
-  async getCardsByDeck(deckId: string): Promise<FlashcardItem[]> {
-    const { results } = await fetchAllPages<FlashcardItem>(apiClient, "/flashcards/", {
-      deck: deckId,
-    });
-    return results;
-  },
-
-  async updateFlashcard(id: string, payload: Partial<FlashcardItem>): Promise<FlashcardItem> {
-    const res = await apiClient.patch<FlashcardItem>(`/flashcards/${id}/`, payload);
+  async create(payload: {
+    deck: string;
+    question: string;
+    answer: string;
+  }): Promise<Flashcard> {
+    const res = await apiClient.post<Flashcard>("/flashcards/", payload);
     return res.data;
   },
 
-  async deleteFlashcard(id: string): Promise<void> {
+  async update(
+    id: string,
+    payload: Partial<{ question: string; answer: string; deck?: string }>
+  ): Promise<Flashcard> {
+    const res = await apiClient.patch<Flashcard>(`/flashcards/${id}/`, payload);
+    return res.data;
+  },
+
+  async remove(id: string): Promise<void> {
     await apiClient.delete(`/flashcards/${id}/`);
+  },
+
+  // Aliases for backwards compatibility
+  getFlashcards(filter?: { document?: string; deck?: string } | string) {
+    const params = typeof filter === "string" ? { document: filter } : filter;
+    return this.list(params);
+  },
+  getCardsByDeck(deckId: string) {
+    return this.list({ deck: deckId });
+  },
+  updateFlashcard(id: string, payload: Partial<Flashcard>) {
+    return this.update(id, payload);
+  },
+  deleteFlashcard(id: string) {
+    return this.remove(id);
   },
 };
 

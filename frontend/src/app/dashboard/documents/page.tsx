@@ -8,6 +8,7 @@ import { DocumentUploadModal } from "@/components/dashboard/DocumentUploadModal"
 import { DocumentsView } from "@/components/dashboard/views/DocumentsView";
 import {
   useDocuments,
+  useDecks,
   useUploadDocument,
   useRetryDocument,
   useGenerateFlashcards,
@@ -20,6 +21,7 @@ export default function DocumentsPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const documentsQuery = useDocuments();
+  const decksQuery = useDecks();
   const uploadDocMutation = useUploadDocument();
   const retryDocMutation = useRetryDocument();
   const generateCardsMutation = useGenerateFlashcards();
@@ -38,6 +40,17 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleGenerateFlashcards = async (docId: string) => {
+    try {
+      const res = await generateCardsMutation.mutateAsync(docId);
+      if (res?.deck_id) {
+        router.push(`/dashboard/flashcards/${res.deck_id}`);
+      }
+    } catch (err: unknown) {
+      notify.error(formatApiErrorMessage(err), "Flashcard Generation Failed");
+    }
+  };
+
   const handleStartQuiz = async (docId: string) => {
     try {
       const session = await startQuizMutation.mutateAsync(docId);
@@ -51,11 +64,15 @@ export default function DocumentsPage() {
     <>
       <DocumentsView
         documents={documentsQuery.data}
-        isLoading={documentsQuery.isLoading}
+        decks={decksQuery.data}
+        isLoading={documentsQuery.isLoading || decksQuery.isLoading}
         isError={documentsQuery.isError}
-        onRetry={() => documentsQuery.refetch()}
+        onRetry={() => {
+          documentsQuery.refetch();
+          decksQuery.refetch();
+        }}
         onUploadClick={() => setIsUploadModalOpen(true)}
-        onGenerateFlashcards={(docId) => generateCardsMutation.mutate(docId)}
+        onGenerateFlashcards={handleGenerateFlashcards}
         onStartQuiz={handleStartQuiz}
         onDeleteDocument={(docId) => deleteDocMutation.mutate(docId)}
         onRetryDocument={(docId) => retryDocMutation.mutate(docId)}

@@ -1,37 +1,37 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { FlashcardsView } from "@/components/dashboard/views/FlashcardsView";
-import {
-  useDocuments,
-  useFlashcards,
-  useGenerateFlashcards,
-} from "@/lib/use-dashboard-queries";
+import { useDecks, useDocuments, useCreateDeck } from "@/lib/use-dashboard-queries";
 
 export default function FlashcardsPage() {
   const router = useRouter();
-  const [selectedDocId, setSelectedDocId] = useState<string>("all");
+  const decksQuery = useDecks();
   const documentsQuery = useDocuments();
-  const flashcardsQuery = useFlashcards(
-    selectedDocId !== "all" ? { document: selectedDocId } : undefined
-  );
-  const generateCardsMutation = useGenerateFlashcards();
+  const createDeckMutation = useCreateDeck();
+
+  const handleCreateDeck = async (payload: {
+    title: string;
+    description?: string;
+    document?: string | null;
+  }) => {
+    const newDeck = await createDeckMutation.mutateAsync(payload);
+    router.push(`/dashboard/flashcards/${newDeck.id}`);
+    return newDeck;
+  };
 
   return (
     <FlashcardsView
+      decks={decksQuery.data}
       documents={documentsQuery.data}
-      flashcards={flashcardsQuery.data}
-      selectedDocId={selectedDocId}
-      onSelectDocId={(id) => setSelectedDocId(id)}
-      isLoading={flashcardsQuery.isLoading || documentsQuery.isLoading}
-      isError={flashcardsQuery.isError}
+      isLoading={decksQuery.isLoading || documentsQuery.isLoading}
+      isError={decksQuery.isError}
       onRetry={() => {
-        flashcardsQuery.refetch();
+        decksQuery.refetch();
         documentsQuery.refetch();
       }}
-      onGenerateFlashcards={(docId) => generateCardsMutation.mutate(docId)}
-      onNavigateDocuments={() => router.push("/dashboard/documents")}
+      onCreateDeck={handleCreateDeck}
     />
   );
 }

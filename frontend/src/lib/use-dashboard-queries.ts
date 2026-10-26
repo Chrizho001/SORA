@@ -65,6 +65,19 @@ export function useDocuments() {
   });
 }
 
+export function useDocument(id?: string | null) {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  return useQuery({
+    queryKey: qk(user?.id, "document", id),
+    queryFn: () => documentsApi.getDocument(id!),
+    enabled: !!user && !isAuthLoading && !!id,
+    refetchInterval: (query) => {
+      const doc = query.state.data;
+      return doc?.flashcard_generation_status === "GENERATING" ? 3000 : false;
+    },
+  });
+}
+
 export function useUploadDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -167,8 +180,26 @@ export function useDecks(params?: { document?: string }) {
   const { user, isLoading: isAuthLoading } = useAuth();
   return useQuery({
     queryKey: qk(user?.id, "decks", params),
-    queryFn: () => decksApi.getDecks(params),
+    queryFn: () => decksApi.list(params),
     enabled: !!user && !isAuthLoading,
+  });
+}
+
+export function useDeck(id?: string | null) {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  return useQuery({
+    queryKey: qk(user?.id, "deck", id),
+    queryFn: () => decksApi.get(id!),
+    enabled: !!user && !isAuthLoading && !!id,
+  });
+}
+
+export function useDeckCards(deckId?: string | null) {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  return useQuery({
+    queryKey: qk(user?.id, "flashcards", "deck", deckId),
+    queryFn: () => flashcardsApi.list({ deck: deckId! }),
+    enabled: !!user && !isAuthLoading && !!deckId,
   });
 }
 
@@ -183,11 +214,170 @@ export function useFlashcards(filter?: { document?: string; deck?: string } | st
 }
 
 export function useCardsByDeck(deckId: string) {
-  const { user, isLoading: isAuthLoading } = useAuth();
-  return useQuery({
-    queryKey: qk(user?.id, "flashcards", "deck", deckId),
-    queryFn: () => flashcardsApi.getCardsByDeck(deckId),
-    enabled: !!user && !isAuthLoading && !!deckId,
+  return useDeckCards(deckId);
+}
+
+export function useCreateDeck() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (payload: { title: string; description?: string; document?: string | null }) =>
+      decksApi.create(payload),
+    onSuccess: (newDeck) => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
+      notify.success(`Deck "${newDeck.title}" created!`, "Deck Created");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Failed to Create Deck");
+    },
+  });
+}
+
+export function useUpdateDeck() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<{ title: string; description: string }>;
+    }) => decksApi.update(id, payload),
+    onSuccess: (updatedDeck) => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "deck", updatedDeck.id) });
+      notify.success("Deck updated.", "Deck Saved");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Failed to Update Deck");
+    },
+  });
+}
+
+export function useDeleteDeck() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (id: string) => decksApi.remove(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
+      queryClient.removeQueries({ queryKey: qk(user?.id, "deck", id) });
+      queryClient.removeQueries({ queryKey: qk(user?.id, "flashcards", "deck", id) });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards") });
+      notify.info("Deck and its cards deleted.", "Deck Removed");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Failed to Delete Deck");
+    },
+  });
+}
+
+export function useGenerateDeckFlashcards() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ deckId, count }: { deckId: string; count?: number }) =>
+      decksApi.generate(deckId, { count }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "documents") });
+      notify.success(
+        "SORA AI is generating smart flashcards for this deck!",
+        "Generation Started"
+      );
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Generation Failed");
+    },
+  });
+}
+
+export function useStartDeckQuiz() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ deckId, questionCount }: { deckId: string; questionCount?: number }) =>
+      decksApi.startQuiz(deckId, { question_count: questionCount }),
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "quiz-sessions") });
+      notify.success(
+        `Quiz started with ${session.total_questions} questions!`,
+        "Quiz Ready"
+      );
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Unable to Start Quiz");
+    },
+  });
+}
+
+export function useCreateFlashcard() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (payload: { deck: string; question: string; answer: string }) =>
+      flashcardsApi.create(payload),
+    onSuccess: (card) => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards", "deck", card.deck) });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "deck", card.deck) });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards") });
+      notify.success("Flashcard added to deck!", "Card Created");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Failed to Add Card");
+    },
+  });
+}
+
+export function useUpdateFlashcard() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<{ question: string; answer: string; deck?: string }>;
+    }) => flashcardsApi.update(id, payload),
+    onSuccess: (card) => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards", "deck", card.deck) });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "deck", card.deck) });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards") });
+      notify.success("Flashcard updated.", "Card Saved");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Failed to Update Card");
+    },
+  });
+}
+
+export function useDeleteFlashcard() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ id }: { id: string; deckId: string }) =>
+      flashcardsApi.remove(id),
+    onSuccess: (_, { deckId }) => {
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards", "deck", deckId) });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "deck", deckId) });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "decks") });
+      queryClient.invalidateQueries({ queryKey: qk(user?.id, "flashcards") });
+      notify.info("Flashcard deleted.", "Card Removed");
+    },
+    onError: (error: unknown) => {
+      const msg = formatApiErrorMessage(error);
+      notify.error(msg, "Failed to Delete Card");
+    },
   });
 }
 

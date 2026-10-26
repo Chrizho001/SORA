@@ -453,7 +453,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     error (with a Retry button) and empty states distinctly.
   - **Prompt:** P-09
 
-- [ ] **FE-05 · P0 · Flashcards and decks UI: create, edit, delete and browse by deck**
+- [x] **FE-05 · P0 · Flashcards and decks UI: create, edit, delete and browse by deck**
   - **Where:** `frontend/src/components/dashboard/views/FlashcardsView.tsx`, `src/lib/dashboard-api.ts`.
   - **Acceptable solution:**
     - Deck list (title, card count, source document).
@@ -471,7 +471,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     the client.
   - **Prompt:** P-16
 
-- [ ] **FE-07 · P1 · Flashcards don't appear after AI generation finishes**
+- [x] **FE-07 · P1 · Flashcards don't appear after AI generation finishes**
   - **Where:** `frontend/src/lib/use-dashboard-queries.ts` (`useGenerateFlashcards` invalidates immediately).
   - **Acceptable solution:** while generation is `GENERATING`, poll the document. On the change to
     `DONE`/`FAILED`, invalidate `["flashcards"]`, `["decks"]` and `["notifications"]`.
