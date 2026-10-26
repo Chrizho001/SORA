@@ -1,14 +1,28 @@
+import logging
+from datetime import timedelta
+
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.accounts.exceptions import ConflictError
 from apps.documents.models import Document
 from apps.documents.serializers import (
     DocumentListSerializer,
     DocumentSerializer,
     DocumentUploadSerializer,
 )
+from apps.documents.services import retry_document
+from apps.documents.tasks import process_document
+from apps.flashcards.models import Deck
+from apps.flashcards.tasks import generate_flashcards_task
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
@@ -37,17 +51,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        from django.db import transaction
-
         with transaction.atomic():
             document = serializer.save()
 
             def enqueue():
-                import logging
-
-                from apps.documents.tasks import process_document
-
-                logger = logging.getLogger(__name__)
                 try:
                     process_document.delay(str(document.id))
                 except Exception as exc:
@@ -65,8 +72,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED, headers=headers)
 
     def perform_destroy(self, instance):
-        from django.db import transaction
-
         file = instance.file
         instance.delete()
         if file:
@@ -77,8 +82,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document = self.get_object()
 
         if document.status != Document.Status.DONE:
-            from rest_framework.exceptions import ValidationError
-
             raise ValidationError(
                 {"document": ["Document summary must be completed before generating flashcards."]},
                 code="summary_not_ready",
@@ -90,14 +93,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
             if count < 5 or count > 20:
                 raise ValueError()
         except (TypeError, ValueError):
-            from rest_framework.exceptions import ValidationError
-
             raise ValidationError(
                 {"count": ["Count must be an integer between 5 and 20."]},
                 code="invalid_count",
             )
-
-        from apps.flashcards.models import Deck
 
         deck = Deck.objects.filter(user=request.user, document=document).first()
         if not deck:
@@ -110,13 +109,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 counter += 1
                 title = f"{base_title} ({counter})"
             deck = Deck.objects.create(user=request.user, title=title, document=document)
-
-        from datetime import timedelta
-
-        from django.db.models import Q
-        from django.utils import timezone
-
-        from apps.accounts.exceptions import ConflictError
 
         now = timezone.now()
         stale_threshold = now - timedelta(minutes=10)
@@ -136,8 +128,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
             )
 
         # Queue celery task
-        from apps.flashcards.tasks import generate_flashcards_task
-
         try:
             generate_flashcards_task.delay(str(deck.id), count=count)
         except Exception:
@@ -155,8 +145,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="retry")
     def retry(self, request, pk=None):
         document = self.get_object()
-        from apps.documents.services import retry_document
-
         retry_document(document)
         return Response(
             {"status": "Retrying document analysis..."},

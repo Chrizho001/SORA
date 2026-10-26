@@ -151,3 +151,155 @@ def test_gemini_summarizer_inline_pdf_only_when_text_empty():
         sent_payload = mock_post.call_args.kwargs["json"]
         parts = sent_payload["contents"][0]["parts"]
         assert any("inline_data" in part for part in parts)
+
+
+def test_gemini_summarizer_missing_api_key(settings):
+    settings.AI_API_KEY = ""
+    from apps.documents.ai import GeminiSummarizerClient
+
+    client = GeminiSummarizerClient(api_key="")
+    with pytest.raises(DocumentProcessingError, match="AI service authentication failed"):
+        client.summarize("Sample text")
+
+
+def test_gemini_summarizer_503_then_200_retry():
+    from unittest.mock import MagicMock, patch
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    client = GeminiSummarizerClient(api_key="valid-key")
+    mock_503 = MagicMock()
+    mock_503.status_code = 503
+
+    mock_200 = MagicMock()
+    mock_200.status_code = 200
+    mock_200.json.return_value = {
+        "candidates": [{"content": {"parts": [{"text": "Retry succeeded summary"}]}}]
+    }
+
+    with patch("apps.documents.ai.requests.post", side_effect=[mock_503, mock_200]) as mock_post:
+        with patch("apps.documents.ai.time.sleep") as mock_sleep:
+            summary = client.summarize("Sample text to summarize")
+            assert summary == "Retry succeeded summary"
+            assert mock_post.call_count == 2
+            mock_sleep.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "status_code, expected_match",
+    [
+        (401, "AI service authentication failed"),
+        (403, "AI service authentication failed"),
+        (429, "AI rate limit reached"),
+        (503, "AI service is busy"),
+    ],
+)
+def test_gemini_summarizer_http_errors(status_code, expected_match):
+    from unittest.mock import MagicMock, patch
+
+    import requests
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    client = GeminiSummarizerClient(api_key="valid-key")
+    mock_resp = MagicMock()
+    mock_resp.status_code = status_code
+    http_error = requests.exceptions.HTTPError("Error", response=mock_resp)
+    mock_resp.raise_for_status.side_effect = http_error
+
+    with patch("apps.documents.ai.requests.post", return_value=mock_resp):
+        with patch("apps.documents.ai.time.sleep"):
+            with pytest.raises(DocumentProcessingError, match=expected_match):
+                client.summarize("Sample text")
+
+
+def test_gemini_summarizer_request_exception_timeout():
+    from unittest.mock import patch
+
+    import requests
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    client = GeminiSummarizerClient(api_key="valid-key")
+    with patch(
+        "apps.documents.ai.requests.post", side_effect=requests.exceptions.Timeout("Timeout")
+    ):
+        with patch("apps.documents.ai.time.sleep"):
+            with pytest.raises(
+                DocumentProcessingError, match="Network error contacting AI service"
+            ):
+                client.summarize("Sample text")
+
+
+def test_gemini_summarizer_empty_candidates():
+    from unittest.mock import MagicMock, patch
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    client = GeminiSummarizerClient(api_key="valid-key")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"candidates": []}
+
+    with patch("apps.documents.ai.requests.post", return_value=mock_resp):
+        with pytest.raises(DocumentProcessingError, match="AI service error"):
+            client.summarize("Sample text")
+
+
+def test_gemini_summarizer_invalid_json():
+    from unittest.mock import MagicMock, patch
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    client = GeminiSummarizerClient(api_key="valid-key")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"candidates": [{"content": {"parts": []}}]}
+
+    with patch("apps.documents.ai.requests.post", return_value=mock_resp):
+        with pytest.raises(DocumentProcessingError, match="AI service error"):
+            client.summarize("Sample text")
+
+
+@pytest.mark.parametrize(
+    "status_code, expected_match",
+    [
+        (401, "AI service authentication failed"),
+        (403, "AI service authentication failed"),
+        (429, "AI rate limit reached"),
+        (503, "AI service is busy"),
+        (500, "AI service error"),
+    ],
+)
+def test_summarizer_client_http_errors(status_code, expected_match):
+    from unittest.mock import MagicMock, patch
+
+    import requests
+
+    from apps.documents.ai import SummarizerClient
+
+    client = SummarizerClient(api_key="valid-key")
+    mock_resp = MagicMock()
+    mock_resp.status_code = status_code
+    http_error = requests.exceptions.HTTPError("Error", response=mock_resp)
+    mock_resp.raise_for_status.side_effect = http_error
+
+    with patch("apps.documents.ai.requests.post", return_value=mock_resp):
+        with pytest.raises(DocumentProcessingError, match=expected_match):
+            client.summarize("Sample text")
+
+
+def test_summarizer_client_request_exception():
+    from unittest.mock import patch
+
+    import requests
+
+    from apps.documents.ai import SummarizerClient
+
+    client = SummarizerClient(api_key="valid-key")
+    with patch(
+        "apps.documents.ai.requests.post",
+        side_effect=requests.exceptions.RequestException("Err"),
+    ):
+        with pytest.raises(DocumentProcessingError, match="Network error contacting AI service"):
+            client.summarize("Sample text")

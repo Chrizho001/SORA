@@ -1,10 +1,21 @@
-from rest_framework import viewsets, mixins, status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
-from rest_framework.response import Response
 from django.utils import timezone
-from apps.notifications.models import Notification, PushSubscription, NotificationPreference
-from apps.notifications.serializers import NotificationSerializer, PushSubscriptionSerializer, NotificationPreferenceSerializer
+from rest_framework import mixins, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from apps.notifications.models import (
+    Notification,
+    NotificationPreference,
+    PushSubscription,
+)
+from apps.notifications.serializers import (
+    NotificationPreferenceSerializer,
+    NotificationSerializer,
+    PushSubscriptionSerializer,
+)
+
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -31,10 +42,11 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         updated = self.get_queryset().filter(read_at__isnull=True).update(read_at=timezone.now())
         return Response({"updated": updated})
 
+
 class PushSubscriptionViewSet(
     mixins.CreateModelMixin,
     mixins.DestroyModelMixin,
-    viewsets.GenericViewSet
+    viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
     serializer_class = PushSubscriptionSerializer
@@ -42,9 +54,10 @@ class PushSubscriptionViewSet(
     def get_queryset(self):
         return PushSubscription.objects.filter(user=self.request.user)
 
+
 class NotificationPreferenceViewSet(
     mixins.ListModelMixin,
-    viewsets.GenericViewSet
+    viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationPreferenceSerializer
@@ -58,10 +71,14 @@ class NotificationPreferenceViewSet(
         serializer.is_valid(raise_exception=True)
         notification_type = serializer.validated_data.get("notification_type")
         if not notification_type:
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({"notification_type": ["This field is required."]}, code="invalid")
-            
-        pref, created = NotificationPreference.objects.update_or_create(
-            user=request.user, notification_type=notification_type, defaults=serializer.validated_data
+            raise ValidationError(
+                {"notification_type": ["This field is required."]},
+                code="invalid",
+            )
+
+        pref, _ = NotificationPreference.objects.update_or_create(
+            user=request.user,
+            notification_type=notification_type,
+            defaults=serializer.validated_data,
         )
         return Response(self.get_serializer(pref).data)

@@ -180,7 +180,17 @@ Ensure the following dependencies are installed on your workstation:
 
 ---
 
-## 🚀 Step-by-Step Installation & Setup
+## 🚀 Run Locally (Step-by-Step Setup)
+
+Running SORA locally involves six key processes:
+1. **db + redis** (PostgreSQL 16 & Redis 7 via Docker Compose)
+2. **migrate** (Django database schema migrations)
+3. **runserver** (Django REST API development server)
+4. **worker** (Celery asynchronous task worker for PDF & AI processing)
+5. **beat** (Celery Beat periodic scheduler for task due reminders & token cleanup)
+6. **frontend** (Next.js 16 development server)
+
+---
 
 ### 1. Clone Repository
 ```bash
@@ -190,20 +200,25 @@ cd SORA
 
 ---
 
-### 2. Start Database & Redis (Docker)
-Start the PostgreSQL 16 database and Redis 7 broker using Docker Compose:
+### 2. Process 1: Start Database & Redis (`db + redis`)
+Start the PostgreSQL 16 database and Redis 7 broker bound to `127.0.0.1`:
 ```bash
-docker compose up -d
+docker compose up -d db redis
 ```
 Verify the containers are healthy:
 ```bash
 docker compose ps
 ```
-*(PostgreSQL will listen on port `5432`, and Redis on port `6379`)*.
+*(PostgreSQL listens on `127.0.0.1:5432`, and Redis on `127.0.0.1:6379`)*.
+
+> **Tip:** You can also run the worker and beat services directly in Docker:
+> ```bash
+> docker compose up -d
+> ```
 
 ---
 
-### 3. Backend Configuration & Setup
+### 3. Backend Configuration & Process 2: Database Migrations (`migrate`)
 
 1. **Navigate to the backend directory**:
    ```bash
@@ -226,11 +241,12 @@ docker compose ps
    ```bash
    cp .env.example .env
    ```
-   Open `backend/.env` in your editor and configure your secrets:
+   Open `backend/.env` in your editor and configure your settings:
    ```ini
    SECRET_KEY=your-secure-random-secret-key-32-chars-min
    DEBUG=True
    DATABASE_URL=postgres://study_user:study_pass@localhost:5432/study_assistant
+   REDIS_URL=redis://:devredis@localhost:6379/0
    FRONTEND_URL=http://localhost:3000
 
    # AI Configuration
@@ -239,7 +255,7 @@ docker compose ps
    AI_MODEL_NAME=gemini-3.5-flash
    ```
 
-5. **Apply database migrations**:
+5. **Run database migrations (`migrate`)**:
    ```bash
    python manage.py migrate
    ```
@@ -251,27 +267,34 @@ docker compose ps
 
 ---
 
-### 4. Start Celery Asynchronous Worker
-Celery processes PDF uploads, extracts document text, and communicates with Google Gemini in the background:
+### 4. Process 3: Start Django API Server (`runserver`)
+In a dedicated terminal (with virtualenv activated in `backend/`):
 ```bash
-# In backend/ with active virtualenv:
-mkdir -p logs
-celery -A config worker -l info -P solo --logfile=logs/celery.log
-```
-*(In a separate terminal or background tab)*.
-
----
-
-### 5. Start Django Development Server
-```bash
-# In backend/ with active virtualenv:
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 127.0.0.1:8000
 ```
 Django API will be accessible at: `http://localhost:8000/api/v1/`
 
 ---
 
-### 6. Frontend Configuration & Setup
+### 5. Process 4: Start Celery Asynchronous Worker (`worker`)
+Celery processes PDF uploads, extracts document text, and communicates with Google Gemini in the background:
+```bash
+# In backend/ with active virtualenv:
+celery -A config worker -l info
+```
+
+---
+
+### 6. Process 5: Start Celery Beat Scheduler (`beat`)
+Celery Beat dispatches periodic tasks, including task due-soon reminders and expired token flushes:
+```bash
+# In backend/ with active virtualenv:
+celery -A config beat -l info
+```
+
+---
+
+### 7. Process 6: Start Frontend Development Server (`frontend`)
 
 1. **Open a new terminal and navigate to the frontend directory**:
    ```bash
@@ -294,7 +317,7 @@ Django API will be accessible at: `http://localhost:8000/api/v1/`
    NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
    ```
 
-4. **Start the Next.js development server**:
+4. **Start the Next.js development server (`frontend`)**:
    ```bash
    npm run dev
    ```

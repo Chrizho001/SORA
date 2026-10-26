@@ -13,6 +13,9 @@ Architecture ref: CLAUDE.md, architecture/00-overview.md, 01-authentication.md Â
 
 import logging
 
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 logger = logging.getLogger(__name__)
@@ -26,7 +29,16 @@ def custom_exception_handler(exc, context):
     response = exception_handler(exc, context)
 
     if response is None:
-        # Unhandled exceptions bubble up to Django's 500 handler.
+        from django.conf import settings
+
+        if not settings.DEBUG:
+            view = context.get("view", None)
+            view_name = view.__class__.__name__ if view else "UnknownView"
+            logger.error("Unhandled exception in %s: %s", view_name, exc, exc_info=True)
+            return Response(
+                {"detail": "Internal server error.", "code": "server_error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return None
 
     # --- Build the envelope ------------------------------------------------
@@ -162,6 +174,9 @@ def _get_field_errors(exc, response):
 
     Returns a dict of {field: [messages]} or None if not a validation error.
     """
+    if not isinstance(exc, ValidationError):
+        return None
+
     if not hasattr(exc, "detail"):
         return None
 
@@ -172,6 +187,8 @@ def _get_field_errors(exc, response):
     # Convert DRF's ErrorDetail objects to plain strings
     errors = {}
     for field, messages in detail.items():
+        if field in ("non_field_errors", "detail"):
+            continue
         if isinstance(messages, list):
             errors[field] = [str(m) for m in messages]
         else:

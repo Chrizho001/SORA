@@ -91,3 +91,63 @@ class TestScaffoldSmokeTests:
             text=True,
         )
         assert proc.returncode != 0
+
+    def test_expired_token_envelope_flattened(self, api_client, user):
+        from datetime import timedelta
+
+        from django.urls import reverse
+        from rest_framework import status
+        from rest_framework_simplejwt.tokens import AccessToken
+
+        token = AccessToken.for_user(user)
+        token.set_exp(lifetime=-timedelta(minutes=5))
+
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {str(token)}")
+        res = api_client.get(reverse("accounts:me"))
+
+        assert res.status_code == status.HTTP_401_UNAUTHORIZED
+        assert res.data["code"] == "token_not_valid"
+        assert isinstance(res.data["detail"], str)
+        assert "errors" not in res.data
+
+    def test_non_field_validation_error_envelope(self):
+        from rest_framework.exceptions import ValidationError
+
+        from config.exceptions import custom_exception_handler
+
+        exc = ValidationError("A non-field validation failure.")
+        res = custom_exception_handler(exc, {"view": None})
+
+        assert res.status_code == 400
+        assert res.data["detail"] == "A non-field validation failure."
+        assert res.data["code"] == "validation_error"
+        assert "errors" not in res.data
+
+    def test_unhandled_exception_returns_500_envelope_when_debug_false(self, api_client):
+        import types
+
+        from django.test import override_settings
+        from django.urls import path
+        from rest_framework import status
+        from rest_framework.views import APIView
+
+        class CrashView(APIView):
+            permission_classes = []
+            authentication_classes = []
+
+            def get(self, request):
+                raise RuntimeError("Unexpected boom!")
+
+        module = types.ModuleType("test_urlconf")
+        module.urlpatterns = [
+            path("test-crash/", CrashView.as_view()),
+        ]
+
+        with override_settings(ROOT_URLCONF=module, DEBUG=False):
+            res = api_client.get("/test-crash/")
+
+        assert res.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert res.data == {
+            "detail": "Internal server error.",
+            "code": "server_error",
+        }

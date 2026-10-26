@@ -188,3 +188,119 @@ def test_celery_test_settings():
     assert getattr(settings, "CELERY_TASK_ALWAYS_EAGER", None) is True
     assert getattr(settings, "CELERY_TASK_EAGER_PROPAGATES", None) is True
     assert getattr(settings, "CELERY_BROKER_URL", None) == "memory://"
+
+
+@pytest.mark.django_db
+def test_send_web_push_task_no_subscriptions(user):
+    from unittest.mock import patch
+
+    from apps.notifications.tasks import send_web_push_task
+
+    with patch("apps.notifications.tasks.webpush") as mock_webpush:
+        send_web_push_task(str(user.id), "Title", "Body", {"key": "val"})
+        mock_webpush.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_send_web_push_task_no_vapid_key_skipped(user, settings):
+    from unittest.mock import patch
+
+    from apps.notifications.models import PushSubscription
+    from apps.notifications.tasks import send_web_push_task
+
+    settings.VAPID_PRIVATE_KEY = ""
+    sub = PushSubscription.objects.create(
+        user=user,
+        endpoint="https://push.example.com/sub1",
+        p256dh="test_p256dh",
+        auth="test_auth",
+    )
+
+    with patch("apps.notifications.tasks.webpush") as mock_webpush:
+        send_web_push_task(str(user.id), "Title", "Body", {"key": "val"})
+        mock_webpush.assert_not_called()
+
+    sub.refresh_from_db()
+    assert sub.last_used_at is None
+    assert sub.revoked_at is None
+
+
+@pytest.mark.django_db
+def test_send_web_push_task_success_sets_last_used_at(user, settings):
+    from unittest.mock import patch
+
+    from apps.notifications.models import PushSubscription
+    from apps.notifications.tasks import send_web_push_task
+
+    settings.VAPID_PRIVATE_KEY = "test_vapid_private_key"
+    sub = PushSubscription.objects.create(
+        user=user,
+        endpoint="https://push.example.com/sub2",
+        p256dh="test_p256dh",
+        auth="test_auth",
+    )
+
+    with patch("apps.notifications.tasks.webpush") as mock_webpush:
+        send_web_push_task(
+            str(user.id), "Title", "Body", {"key": "val"}, notification_id="notif-123"
+        )
+        mock_webpush.assert_called_once()
+
+    sub.refresh_from_db()
+    assert sub.last_used_at is not None
+    assert sub.revoked_at is None
+
+
+@pytest.mark.django_db
+def test_send_web_push_task_410_revokes(user, settings):
+    from unittest.mock import MagicMock, patch
+
+    from pywebpush import WebPushException
+
+    from apps.notifications.models import PushSubscription
+    from apps.notifications.tasks import send_web_push_task
+
+    settings.VAPID_PRIVATE_KEY = "test_vapid_private_key"
+    sub = PushSubscription.objects.create(
+        user=user,
+        endpoint="https://push.example.com/sub3",
+        p256dh="test_p256dh",
+        auth="test_auth",
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 410
+    exc = WebPushException("Subscription expired", response=mock_resp)
+
+    with patch("apps.notifications.tasks.webpush", side_effect=exc):
+        send_web_push_task(str(user.id), "Title", "Body", {})
+
+    sub.refresh_from_db()
+    assert sub.revoked_at is not None
+    assert sub.last_used_at is None
+
+
+@pytest.mark.django_db
+def test_send_web_push_task_other_errors_logged(user, settings):
+    from unittest.mock import patch
+
+    from apps.notifications.models import PushSubscription
+    from apps.notifications.tasks import send_web_push_task
+
+    settings.VAPID_PRIVATE_KEY = "test_vapid_private_key"
+    sub = PushSubscription.objects.create(
+        user=user,
+        endpoint="https://push.example.com/sub4",
+        p256dh="test_p256dh",
+        auth="test_auth",
+    )
+
+    with patch(
+        "apps.notifications.tasks.webpush",
+        side_effect=RuntimeError("Transient network failure"),
+    ):
+        send_web_push_task(str(user.id), "Title", "Body", {})
+
+    sub.refresh_from_db()
+    assert sub.revoked_at is None
+    assert sub.last_used_at is None

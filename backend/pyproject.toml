@@ -14,4 +14,5 @@ DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+testpaths = ["apps"]
 addopts = "-ra -q"

@@ -3,11 +3,11 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: study_assistant
       POSTGRES_USER: study_user
-      POSTGRES_PASSWORD: study_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-study_pass}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -19,17 +19,51 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-devredis}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-devredis} ping | grep PONG"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["celery", "-A", "config", "worker", "-l", "info"]
+    environment:
+      DATABASE_URL: postgres://study_user:${POSTGRES_PASSWORD:-study_pass}@db:5432/study_assistant
+      REDIS_URL: redis://:${REDIS_PASSWORD:-devredis}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      DEBUG: "True"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["celery", "-A", "config", "beat", "-l", "info"]
+    environment:
+      DATABASE_URL: postgres://study_user:${POSTGRES_PASSWORD:-study_pass}@db:5432/study_assistant
+      REDIS_URL: redis://:${REDIS_PASSWORD:-devredis}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      DEBUG: "True"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:
-

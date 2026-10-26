@@ -2,26 +2,26 @@
 
 from django.db import migrations
 
+
 def backfill_questions(apps, schema_editor):
-    QuizQuestion = apps.get_model('quizzes', 'QuizQuestion')
+    QuizQuestion = apps.get_model("quizzes", "QuizQuestion")
     questions = []
-    for q in QuizQuestion.objects.select_related('flashcard'):
+    for q in QuizQuestion.objects.select_related("flashcard"):
         if q.flashcard:
             q.question_text = q.flashcard.question
             q.correct_answer = q.flashcard.answer
             questions.append(q)
     if questions:
-        QuizQuestion.objects.bulk_update(questions, ['question_text', 'correct_answer'])
+        QuizQuestion.objects.bulk_update(questions, ["question_text", "correct_answer"])
+
 
 def reverse_backfill(apps, schema_editor):
     pass
 
+
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('quizzes', '0002_quizquestion_correct_answer_and_more'),
+        ("quizzes", "0002_quizquestion_correct_answer_and_more"),
     ]
 
-    operations = [
-        migrations.RunPython(backfill_questions, reverse_backfill)
-    ]
+    operations = [migrations.RunPython(backfill_questions, reverse_backfill)]

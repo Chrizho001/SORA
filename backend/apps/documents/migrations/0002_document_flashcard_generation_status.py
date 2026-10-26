@@ -4,15 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('documents', '0001_initial'),
+        ("documents", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='document',
-            name='flashcard_generation_status',
-            field=models.CharField(choices=[('PENDING', 'Pending'), ('GENERATING', 'Generating'), ('DONE', 'Done'), ('FAILED', 'Failed')], default='PENDING', max_length=20),
+            model_name="document",
+            name="flashcard_generation_status",
+            field=models.CharField(
+                choices=[
+                    ("PENDING", "Pending"),
+                    ("GENERATING", "Generating"),
+                    ("DONE", "Done"),
+                    ("FAILED", "Failed"),
+                ],
+                default="PENDING",
+                max_length=20,
+            ),
         ),
     ]

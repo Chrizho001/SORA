@@ -13,10 +13,9 @@ import logging
 
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
-
-
 from .exceptions import GoogleTokenInvalid, GoogleUnavailable
+
+logger = logging.getLogger(__name__)
 
 
 def verify_google_id_token(credential: str) -> dict:

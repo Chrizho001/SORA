@@ -13,7 +13,14 @@ from .models import SocialAccount, User
 class UserAdmin(BaseUserAdmin):
     """Admin configuration for the custom User model."""
 
-    list_display = ("email", "first_name", "last_name", "is_email_verified", "is_active", "date_joined")
+    list_display = (
+        "email",
+        "first_name",
+        "last_name",
+        "is_email_verified",
+        "is_active",
+        "date_joined",
+    )
     list_filter = ("is_email_verified", "is_active", "is_staff", "is_superuser")
     search_fields = ("email", "first_name", "last_name")
     ordering = ("-date_joined",)
@@ -24,7 +31,16 @@ class UserAdmin(BaseUserAdmin):
         (_("Personal info"), {"fields": ("first_name", "last_name")}),
         (
             _("Permissions"),
-            {"fields": ("is_active", "is_email_verified", "is_staff", "is_superuser", "groups", "user_permissions")},
+            {
+                "fields": (
+                    "is_active",
+                    "is_email_verified",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
         ),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )

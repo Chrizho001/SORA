@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 def _dispatch_push(recipient_id, title, body, data, notification_id=None):
     try:
+        # Function-local import to prevent circular import with apps.notifications.tasks
         from apps.notifications.tasks import send_web_push_task
 
         send_web_push_task.delay(

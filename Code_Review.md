@@ -131,7 +131,7 @@ This file is the **single source of truth for open work**. It supersedes
     refresh cookie>, endpoint=...)`. If no user can be resolved, skip the revoke.
   - **Prompt:** P-01
 
-- [ ] **SEC-08 · P1 · Postgres and Redis are exposed on all interfaces with fixed credentials**
+- [x] **SEC-08 · P1 · Postgres and Redis are exposed on all interfaces with fixed credentials**
   - **Where:** `docker-compose.yml`.
   - **Acceptable solution:** bind ports to `127.0.0.1:5432:5432` and `127.0.0.1:6379:6379`, and read the
     Postgres password from `.env` (`${POSTGRES_PASSWORD:-study_pass}`).
@@ -290,7 +290,7 @@ This file is the **single source of truth for open work**. It supersedes
     length-similar distractor selection, and a question snapshot. Fixed as part of FEAT-02.
   - **Prompt:** P-05
 
-- [ ] **BUG-13 · P2 · Error envelope inconsistencies**
+- [x] **BUG-13 · P2 · Error envelope inconsistencies**
   - **Where:** `backend/config/exceptions.py`.
   - **Problem:**
     - SimpleJWT 401s put a stringified dict into `errors`.
@@ -368,19 +368,19 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
 
 ## 5. Backend — Quality and Process
 
-- [ ] **QUAL-01 · P0 · `ruff check` reports 250 errors; 46 files are unformatted**
+- [x] **QUAL-01 · P0 · `ruff check` reports 250 errors; 46 files are unformatted**
   - **Acceptable solution:** run `ruff check --fix . && ruff format .`, then fix the rest by hand (E501,
     E402, N818, F841, F405). `ruff check .` must report 0.
   - **Prompt:** P-08
 
-- [ ] **QUAL-02 · P0 · Three modules are below 90% coverage**
+- [x] **QUAL-02 · P0 · Three modules are below 90% coverage**
   - **Where:** `documents/ai.py` (31%), `flashcards/ai.py` (47%), `notifications/tasks.py` (53%).
   - **Acceptable solution:** unit tests that patch `requests.post` and `pywebpush.webpush`, covering
     success, 401/403, 429, 503 retry, timeout, invalid JSON, and 404/410 revoking the subscription.
     Each app ≥ 90%.
   - **Prompt:** P-08
 
-- [ ] **QUAL-03 · P1 · Stray and dangerous scripts are tracked in git**
+- [x] **QUAL-03 · P1 · Stray and dangerous scripts are tracked in git**
   - **Where:**
     - `backend/demo_flow.py` deletes users in whichever DB is configured.
     - `backend/test_e2e_auth.py`.
@@ -393,7 +393,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     paths or secrets), and add `testpaths = ["apps"]` to `pyproject.toml`.
   - **Prompt:** P-08
 
-- [ ] **QUAL-04 · P2 · Code smells**
+- [x] **QUAL-04 · P2 · Code smells**
   - Imports inside functions and class bodies (`accounts/views.py`).
   - Exception classes defined inside handlers.
   - `config/urls.py` creates its own `environ.Env()` and imports `settings` without using it.
@@ -404,7 +404,7 @@ optional shortcut that adds cards to a deck.** See `architecture/adr/0003-manual
     `apps/documents/services.py`.
   - **Prompt:** P-08
 
-- [ ] **QUAL-05 · P1 · No Celery worker or beat in the run instructions, so reminders and AI jobs never run**
+- [x] **QUAL-05 · P1 · No Celery worker or beat in the run instructions, so reminders and AI jobs never run**
   - **Where:** `docker-compose.yml`, `README.md`.
   - **Acceptable solution:** add `worker` and `beat` services to compose (or document
     `celery -A config worker -l info` and `celery -A config beat -l info`). The README "Run locally"

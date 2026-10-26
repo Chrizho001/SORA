@@ -1,13 +1,21 @@
+from datetime import timedelta
+
 from django.db import IntegrityError
-from django.db.models import Count
+from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.accounts.exceptions import ConflictError
+from apps.documents.models import Document
 from apps.flashcards.models import Deck, Flashcard
 from apps.flashcards.serializers import DeckSerializer, FlashcardSerializer
+from apps.flashcards.tasks import generate_flashcards_task
+from apps.quizzes.serializers import QuizSessionDetailSerializer, StartQuizSerializer
+from apps.quizzes.services import start_quiz
 
 
 class DeckViewSet(
@@ -41,11 +49,17 @@ class DeckViewSet(
         return qs
 
     def perform_create(self, serializer):
+        user = self.request.user
+        if Deck.objects.filter(user=user).count() >= 200:
+            raise ValidationError(
+                {"detail": "Maximum deck limit reached (200 decks per user)."},
+                code="deck_limit",
+            )
         try:
-            serializer.save(user=self.request.user)
+            serializer.save(user=user)
         except IntegrityError:
             raise ValidationError(
-                {"title": ["A deck with this title already exists."]},
+                {"title": ["You already have a deck with this title."]},
                 code="deck_title_taken",
             )
 
@@ -54,7 +68,7 @@ class DeckViewSet(
             serializer.save()
         except IntegrityError:
             raise ValidationError(
-                {"title": ["A deck with this title already exists."]},
+                {"title": ["You already have a deck with this title."]},
                 code="deck_title_taken",
             )
 
@@ -67,15 +81,6 @@ class DeckViewSet(
 
     @action(detail=True, methods=["post"], url_path="generate-flashcards")
     def generate_flashcards(self, request, pk=None):
-        from datetime import timedelta
-
-        from django.db.models import Q
-        from django.utils import timezone
-
-        from apps.accounts.exceptions import ConflictError
-        from apps.documents.models import Document
-        from apps.flashcards.tasks import generate_flashcards_task
-
         deck = self.get_object()
 
         if not deck.document:
@@ -116,7 +121,8 @@ class DeckViewSet(
 
         if not claimed:
             raise ConflictError(
-                "Flashcards are already being generated.", code="generation_in_progress"
+                "Flashcards are already being generated for this document.",
+                code="generation_in_progress",
             )
 
         try:
@@ -133,9 +139,6 @@ class DeckViewSet(
     @action(detail=True, methods=["post"], url_path="start-quiz", url_name="start-quiz")
     def start_quiz(self, request, pk=None):
         deck = self.get_object()
-
-        from apps.quizzes.serializers import QuizSessionDetailSerializer, StartQuizSerializer
-        from apps.quizzes.services import start_quiz
 
         serializer = StartQuizSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -184,22 +187,16 @@ class FlashcardViewSet(
         return qs
 
     def perform_create(self, serializer):
-        from django.utils import timezone
-
         card = serializer.save(user=self.request.user)
         Deck.objects.filter(pk=card.deck_id).update(updated_at=timezone.now())
 
     def perform_update(self, serializer):
-        from django.utils import timezone
-
         old_deck_id = serializer.instance.deck_id
         card = serializer.save()
         new_deck_id = card.deck_id
         Deck.objects.filter(pk__in=[old_deck_id, new_deck_id]).update(updated_at=timezone.now())
 
     def perform_destroy(self, instance):
-        from django.utils import timezone
-
         deck_id = instance.deck_id
         instance.delete()
         Deck.objects.filter(pk=deck_id).update(updated_at=timezone.now())

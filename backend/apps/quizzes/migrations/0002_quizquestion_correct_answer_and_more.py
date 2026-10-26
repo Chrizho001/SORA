@@ -5,26 +5,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('flashcards', '0001_initial'),
-        ('quizzes', '0001_initial'),
+        ("flashcards", "0001_initial"),
+        ("quizzes", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='quizquestion',
-            name='correct_answer',
-            field=models.TextField(default=''),
+            model_name="quizquestion",
+            name="correct_answer",
+            field=models.TextField(default=""),
         ),
         migrations.AddField(
-            model_name='quizquestion',
-            name='question_text',
-            field=models.TextField(default=''),
+            model_name="quizquestion",
+            name="question_text",
+            field=models.TextField(default=""),
         ),
         migrations.AlterField(
-            model_name='quizquestion',
-            name='flashcard',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='flashcards.flashcard'),
+            model_name="quizquestion",
+            name="flashcard",
+            field=models.ForeignKey(
+                null=True, on_delete=django.db.models.deletion.SET_NULL, to="flashcards.flashcard"
+            ),
         ),
     ]

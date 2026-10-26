@@ -1,11 +1,32 @@
+from urllib.parse import urlparse
+
 from rest_framework import serializers
-from apps.notifications.models import Notification, PushSubscription, NotificationPreference
+
+from apps.notifications.models import Notification, NotificationPreference, PushSubscription
+
+PUSH_HOSTS = {
+    "fcm.googleapis.com",
+    "updates.push.services.mozilla.com",
+    "web.push.apple.com",
+}
+PUSH_HOST_SUFFIXES = (".notify.windows.com", ".push.apple.com")
+
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
-        fields = ["id", "type", "title", "body", "data", "read_at", "created_at", "expires_at"]
-        read_only_fields = ["id", "type", "title", "body", "data", "read_at", "created_at", "expires_at"]
+        fields = [
+            "id",
+            "type",
+            "title",
+            "body",
+            "data",
+            "read_at",
+            "created_at",
+            "expires_at",
+        ]
+        read_only_fields = fields
+
 
 class PushSubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,21 +36,18 @@ class PushSubscriptionSerializer(serializers.ModelSerializer):
         extra_kwargs = {"endpoint": {"validators": []}}
 
     def validate_endpoint(self, value):
-        from urllib.parse import urlparse
-        
-        PUSH_HOSTS = {"fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com"}
-        PUSH_HOST_SUFFIXES = (".notify.windows.com", ".push.apple.com")
-        
         url = urlparse(value)
         host = (url.hostname or "").lower()
         if url.scheme != "https" or not (host in PUSH_HOSTS or host.endswith(PUSH_HOST_SUFFIXES)):
-            raise serializers.ValidationError("Unsupported push service.", code="invalid_push_endpoint")
+            raise serializers.ValidationError(
+                "Unsupported push service.", code="invalid_push_endpoint"
+            )
         return value
 
     def create(self, validated_data):
         user = self.context["request"].user
         endpoint = validated_data.get("endpoint")
-        
+
         sub, created = PushSubscription.objects.update_or_create(
             endpoint=endpoint,
             defaults={
@@ -37,10 +55,11 @@ class PushSubscriptionSerializer(serializers.ModelSerializer):
                 "p256dh": validated_data.get("p256dh"),
                 "auth": validated_data.get("auth"),
                 "user_agent": validated_data.get("user_agent", ""),
-                "revoked_at": None, 
-            }
+                "revoked_at": None,
+            },
         )
         return sub
+
 
 class NotificationPreferenceSerializer(serializers.ModelSerializer):
     class Meta:

@@ -1,12 +1,15 @@
 import json
 import logging
+from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 from pywebpush import WebPushException, webpush
 
-from apps.notifications.models import PushSubscription
+from apps.notifications.models import NotificationType, PushSubscription
+from apps.notifications.notification_service import NotificationService
+from apps.tasks.models import Task
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +70,6 @@ def send_web_push_task(
 
 @shared_task
 def send_due_task_reminders():
-    from datetime import timedelta
-
-    from apps.notifications.models import NotificationType
-    from apps.notifications.notification_service import NotificationService
-    from apps.tasks.models import Task
-
     now = timezone.now()
     window_end = now + timedelta(hours=24)
 

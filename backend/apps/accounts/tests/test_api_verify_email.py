@@ -1,9 +1,9 @@
 """
 Group 3 — Email verification endpoint tests.
 
-Architecture ref: 01-authentication.md §4 (POST verify-email/, POST verify-email/resend/), §7 (Group 3).
+Architecture ref: 01-authentication.md §4 (POST verify-email/,
+POST verify-email/resend/), §7 (Group 3).
 """
-
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -56,7 +56,7 @@ class TestVerifyEmailAPI:
         with freeze_time("2026-01-01 12:00:00"):
             token = self.get_token_for_user(unverified_user)
 
-        with freeze_time("2026-01-02 12:00:01"): # > 24 hours
+        with freeze_time("2026-01-02 12:00:01"):  # > 24 hours
             response = api_client.post(self.url, {"token": token}, format="json")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
