@@ -22,14 +22,9 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
+  // Serwist adds a webpack config; an explicit (empty) Turbopack config lets `next dev` run on
+  // Turbopack. Tailwind runs through postcss.config.mjs in both bundlers.
+  turbopack: {},
 };
 
 export default withSerwist(nextConfig);
