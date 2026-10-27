@@ -303,3 +303,81 @@ def test_summarizer_client_request_exception():
     ):
         with pytest.raises(DocumentProcessingError, match="Network error contacting AI service"):
             client.summarize("Sample text")
+
+
+# ── Slow or refused generations (2026-10-27: long PDFs timed out and failed with a vague error) ──
+
+
+def _gemini_ok(text="Summary"):
+    from unittest.mock import MagicMock
+
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {"candidates": [{"content": {"parts": [{"text": text}]}}]}
+    return resp
+
+
+def test_gemini_allows_long_generations(settings):
+    """A 43-page PDF measured 87 s; the read timeout must leave room for longer documents."""
+    from unittest.mock import patch
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    with patch("apps.documents.ai.requests.post", return_value=_gemini_ok()) as mock_post:
+        GeminiSummarizerClient(api_key="k").summarize("text")
+    connect, read = mock_post.call_args.kwargs["timeout"]
+    assert connect <= 15
+    assert read >= 240
+
+
+def test_gemini_read_timeout_is_not_retried_and_says_too_long():
+    """Retrying a generation that already ran out of time only doubles the wait."""
+    from unittest.mock import patch
+
+    import requests
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    with patch(
+        "apps.documents.ai.requests.post", side_effect=requests.exceptions.ReadTimeout()
+    ) as mock_post:
+        with pytest.raises(DocumentProcessingError, match="took too long"):
+            GeminiSummarizerClient(api_key="k").summarize("text")
+    assert mock_post.call_count == 1
+
+
+def test_gemini_connection_error_is_retried():
+    from unittest.mock import patch
+
+    import requests
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    with patch(
+        "apps.documents.ai.requests.post",
+        side_effect=[requests.exceptions.ConnectionError(), _gemini_ok("ok")],
+    ) as mock_post:
+        with patch("apps.documents.ai.time.sleep"):
+            assert GeminiSummarizerClient(api_key="k").summarize("text") == "ok"
+    assert mock_post.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"promptFeedback": {"blockReason": "SAFETY"}},
+        {"candidates": [{"finishReason": "RECITATION", "content": {}}]},
+        {"candidates": [{"finishReason": "SAFETY"}]},
+    ],
+)
+def test_gemini_refusal_has_a_clear_message(body):
+    from unittest.mock import MagicMock, patch
+
+    from apps.documents.ai import GeminiSummarizerClient
+
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = body
+    with patch("apps.documents.ai.requests.post", return_value=resp):
+        with pytest.raises(DocumentProcessingError, match="declined to summarise"):
+            GeminiSummarizerClient(api_key="k").summarize("text")

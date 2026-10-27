@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { DocumentItem, Deck } from "@/lib/dashboard-api";
+import { useDocument } from "@/lib/use-dashboard-queries";
 import { MascotGuide } from "../MascotGuide";
 import { FormattedSummary, stripMarkdown } from "../FormattedSummary";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -48,6 +49,13 @@ export function DocumentsView({
   onRetryDocument,
 }: DocumentsViewProps) {
   const [selectedSummaryDoc, setSelectedSummaryDoc] = useState<DocumentItem | null>(null);
+  // List items carry no summary text; fetch the full document when the reader opens.
+  const {
+    data: summaryDetail,
+    isLoading: isSummaryLoading,
+    isError: isSummaryError,
+  } = useDocument(selectedSummaryDoc?.id);
+  const summary = summaryDetail?.summary ?? selectedSummaryDoc?.summary ?? null;
   const [docToDelete, setDocToDelete] = useState<DocumentItem | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
 
@@ -288,11 +296,18 @@ export function DocumentsView({
                     {new Date(doc.created_at).toLocaleDateString()}
                   </p>
 
-                  {/* Summary preview snippet if available */}
-                  {doc.summary && (
+                  {/* Summary preview snippet if available (list items only say whether one exists) */}
+                  {doc.summary ? (
                     <div className="mt-3 p-3 rounded-2xl bg-canvas/60 border border-line/60 text-xs font-body text-ink-2 line-clamp-3">
                       {stripMarkdown(doc.summary.content)}
                     </div>
+                  ) : (
+                    doc.has_summary && (
+                      <div className="mt-3 p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 text-xs font-body text-emerald-900 flex items-center gap-2">
+                        <Sparkles className="size-3.5 text-emerald-600 shrink-0" />
+                        <span>Study-guide summary ready to read.</span>
+                      </div>
+                    )
                   )}
 
                   {/* Taking longer than expected message (FE-20) */}
@@ -429,7 +444,7 @@ export function DocumentsView({
         title={selectedSummaryDoc?.original_name || "Document Summary"}
         description={
           selectedSummaryDoc
-            ? `AI Summary • ${selectedSummaryDoc.summary?.ai_model_used || "SORA AI Engine"}`
+            ? `AI Summary • ${summary?.ai_model_used || "SORA AI Engine"}`
             : undefined
         }
         headerPrefix={
@@ -441,8 +456,21 @@ export function DocumentsView({
       >
         <div className="space-y-4">
           <div className="overflow-y-auto pr-2 max-h-[55vh]">
-            {selectedSummaryDoc?.summary?.content ? (
-              <FormattedSummary content={selectedSummaryDoc.summary.content} />
+            {summary?.content ? (
+              <FormattedSummary content={summary.content} />
+            ) : isSummaryLoading ? (
+              <div className="space-y-3 p-2" aria-busy="true" aria-label="Loading summary">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            ) : isSummaryError ? (
+              <div className="p-8 text-center text-muted space-y-2">
+                <AlertCircle className="size-8 text-rose-500 mx-auto" />
+                <p className="font-display font-semibold text-ink">Couldn&apos;t load the summary</p>
+                <p className="text-xs">Check your connection and open it again.</p>
+              </div>
             ) : (
               <div className="p-8 text-center text-muted space-y-2">
                 <AlertCircle className="size-8 text-amber-500 mx-auto" />

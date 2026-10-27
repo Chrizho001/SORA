@@ -242,3 +242,31 @@ class TestProcessDocumentTask:
 
         process_document(doc_id)
         assert not Document.objects.filter(id=doc_id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+class TestProcessDocumentTimeouts:
+    def test_task_time_limits_leave_room_for_long_generations(self):
+        assert process_document.soft_time_limit >= 480
+        assert process_document.time_limit > process_document.soft_time_limit
+
+    @patch("apps.notifications.notification_service.NotificationService.notify")
+    @patch("apps.documents.tasks.SummarizerClient.summarize")
+    @patch("apps.documents.tasks.pypdf.PdfReader")
+    def test_soft_time_limit_marks_failed_with_clear_message(
+        self, mock_pdf_reader, mock_summarize, mock_notify, document
+    ):
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        page = MagicMock()
+        page.extract_text.return_value = "Some lecture text"
+        mock_pdf_reader.return_value.is_encrypted = False
+        mock_pdf_reader.return_value.pages = [page]
+        mock_summarize.side_effect = SoftTimeLimitExceeded()
+
+        process_document(str(document.id))
+
+        document.refresh_from_db()
+        assert document.status == Document.Status.FAILED
+        assert "took too long" in document.error_message
+        assert document.processing_started_at is None

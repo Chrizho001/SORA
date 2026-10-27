@@ -2,11 +2,14 @@ import logging
 
 import pypdf
 from celery import shared_task
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from apps.documents.ai import (
+    AI_DECLINED_MESSAGE,
+    AI_TOO_SLOW_MESSAGE,
     DocumentProcessingError,
     SummarizerClient,
     get_summarizer,
@@ -49,6 +52,8 @@ SAFE_DOCUMENT_ERRORS = {
     "AI service is busy. Please try again shortly.",
     "Network error contacting AI service. Please try again later.",
     "AI service authentication failed.",
+    AI_TOO_SLOW_MESSAGE,
+    AI_DECLINED_MESSAGE,
 }
 
 
@@ -80,7 +85,9 @@ def _handle_failure(document_id: str, safe_message: str) -> None:
         logger.error("Error handling failure for document %s: %s", document_id, e)
 
 
-@shared_task
+# Long PDFs can take minutes to summarise; the global 240 s soft limit cut them off mid-request.
+# The AI read timeout (AI_REQUEST_TIMEOUT, 300 s) fires before the soft limit.
+@shared_task(soft_time_limit=540, time_limit=600)
 def process_document(document_id: str):
     try:
         doc_entry = (
@@ -219,6 +226,9 @@ def process_document(document_id: str):
 
     except DocumentProcessingError as e:
         _handle_failure(document_id, str(e))
+    except SoftTimeLimitExceeded:
+        logger.error("Document %s hit the task time limit", document_id)
+        _handle_failure(document_id, AI_TOO_SLOW_MESSAGE)
     except Exception:
         logger.exception("Unexpected error processing document %s", document_id)
         _handle_failure(document_id, "We couldn't process this PDF. Please try again.")

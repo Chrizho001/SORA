@@ -327,6 +327,8 @@ AI_API_KEY = env("AI_API_KEY", default="")
 AI_BASE_URL = env("AI_BASE_URL", default="https://generativelanguage.googleapis.com/v1beta/models")
 AI_MODEL_NAME = env("AI_MODEL_NAME", default="gemini-3.5-flash")
 AI_MAX_PROMPT_CHARS = env.int("AI_MAX_PROMPT_CHARS", default=500000)
+# Seconds to wait for the AI to finish generating (must stay below the task soft limit, 540 s).
+AI_REQUEST_TIMEOUT = env.int("AI_REQUEST_TIMEOUT", default=300)
 
 # ──────────────────────────────────────────────
 # Media (Uploads)

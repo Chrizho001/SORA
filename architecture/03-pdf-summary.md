@@ -78,6 +78,14 @@ Response: 204 No Content
 6. **Idempotency (Celery `acks_late`):** a task for a document already `DONE` with a summary is a no-op. The summary is written with `update_or_create` under `select_for_update`. Failure handlers re-fetch the row under lock, never overwrite `DONE`, and return quietly if the document was deleted.
 7. **AI provider:** `AI_PROVIDER` = `gemini` (default) | `groq` | `mock` (tests/dev only; refused in prod). Gemini receives the PDF bytes **only** when no text could be extracted (scanned PDFs).
 8. **Limits:** ≤ 10 MB (`MAX_UPLOAD_SIZE`), body ≤ 12 MB (rejected early, 413), ≤ `MAX_PDF_PAGES` pages, extracted text capped at `AI_MAX_PROMPT_CHARS` for the prompt, empty file → 400 `file_empty`.
+9. **Slow or refused generations (added 2026-10-27):** summarising a 43-page PDF took 87 s, so the AI
+   read timeout is `AI_REQUEST_TIMEOUT` (300 s, connect 10 s) and `process_document` has its own limits
+   (soft 540 s, hard 600 s) instead of the global 240/300 s. A read timeout is **not** retried; it and the
+   soft limit both fail the document with "This PDF took too long for the AI to summarise…". A Gemini
+   refusal (`promptFeedback.blockReason`, or `finishReason` such as `RECITATION`/`SAFETY` with no text)
+   fails with "The AI declined to summarise this PDF…". Connection errors and 429/503 are retried.
+10. **List vs detail:** the list returns `has_summary` only (PERF-01); clients fetch
+   `GET /documents/{id}/` to show the summary.
 
 ## 6. Security & permissions
 - All endpoints require authentication (`IsAuthenticated`).

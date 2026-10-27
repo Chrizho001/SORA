@@ -9,6 +9,26 @@ from apps.documents.exceptions import DocumentProcessingError
 
 logger = logging.getLogger(__name__)
 
+# User-facing messages (also whitelisted in tasks.SAFE_DOCUMENT_ERRORS).
+AI_TOO_SLOW_MESSAGE = (
+    "This PDF took too long for the AI to summarise. Please try again, "
+    "or upload a shorter section."
+)
+AI_DECLINED_MESSAGE = (
+    "The AI declined to summarise this PDF (it may contain copyrighted or restricted content). "
+    "Try a different document or section."
+)
+# Gemini finish/block reasons that mean "refused", as opposed to a transient failure.
+GEMINI_REFUSAL_REASONS = {
+    "SAFETY",
+    "RECITATION",
+    "BLOCKLIST",
+    "PROHIBITED_CONTENT",
+    "SPII",
+    "IMAGE_SAFETY",
+    "OTHER",
+}
+
 __all__ = [
     "DocumentProcessingError",
     "MockSummarizer",
@@ -168,18 +188,16 @@ class GeminiSummarizerClient:
         last_error = None
         for attempt in range(max_attempts):
             try:
-                response = requests.post(endpoint, headers=headers, json=payload, timeout=120)
+                # A 43-page PDF took 87 s to summarise (measured 2026-10-27), so the read timeout
+                # must be generous; connecting should still fail fast.
+                response = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json=payload,
+                    timeout=(10, getattr(settings, "AI_REQUEST_TIMEOUT", 300)),
+                )
                 if response.status_code == 200:
-                    data = response.json()
-                    candidates = data.get("candidates", [])
-                    if not candidates:
-                        logger.error("Gemini returned an empty candidate list: %s", data)
-                        raise DocumentProcessingError("AI service error. Please try again later.")
-                    content_parts = candidates[0].get("content", {}).get("parts", [])
-                    if not content_parts or "text" not in content_parts[0]:
-                        logger.error("Gemini returned a response without text: %s", data)
-                        raise DocumentProcessingError("AI service error. Please try again later.")
-                    return content_parts[0]["text"]
+                    return self._extract_text(response.json())
 
                 if response.status_code in (503, 429) and attempt < max_attempts - 1:
                     time.sleep(1.5 * (attempt + 1))
@@ -203,6 +221,11 @@ class GeminiSummarizerClient:
                     ) from exc
                 raise DocumentProcessingError("AI service error. Please try again later.") from exc
 
+            except requests.exceptions.ReadTimeout as exc:
+                # The model was still generating; retrying would only double the wait.
+                logger.error("Gemini read timeout: %s", exc)
+                raise DocumentProcessingError(AI_TOO_SLOW_MESSAGE) from exc
+
             except requests.exceptions.RequestException as exc:
                 last_error = exc
                 logger.error("Gemini network error: %s", exc, exc_info=True)
@@ -214,6 +237,28 @@ class GeminiSummarizerClient:
                 ) from exc
 
         logger.error("Failed to generate summary with Gemini after retries: %s", last_error)
+        raise DocumentProcessingError("AI service error. Please try again later.")
+
+    @staticmethod
+    def _extract_text(data: dict) -> str:
+        candidates = data.get("candidates") or []
+        if not candidates:
+            block_reason = (data.get("promptFeedback") or {}).get("blockReason")
+            logger.error("Gemini returned no candidates (blockReason=%s)", block_reason)
+            if block_reason:
+                raise DocumentProcessingError(AI_DECLINED_MESSAGE)
+            raise DocumentProcessingError("AI service error. Please try again later.")
+
+        candidate = candidates[0]
+        parts = (candidate.get("content") or {}).get("parts") or []
+        text = "".join(part.get("text", "") for part in parts if not part.get("thought"))
+        if text.strip():
+            return text
+
+        finish_reason = candidate.get("finishReason")
+        logger.error("Gemini returned no text (finishReason=%s)", finish_reason)
+        if finish_reason in GEMINI_REFUSAL_REASONS:
+            raise DocumentProcessingError(AI_DECLINED_MESSAGE)
         raise DocumentProcessingError("AI service error. Please try again later.")
 
 

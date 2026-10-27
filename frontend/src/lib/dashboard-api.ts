@@ -92,7 +92,10 @@ export interface DocumentItem {
   created_at: string;
   updated_at: string;
   processing_started_at?: string | null;
-  summary: Summary | null;
+  // The list endpoint is lightweight (PERF-01): it sends `has_summary` only. The summary itself comes
+  // from GET /documents/{id}/ (useDocument).
+  has_summary?: boolean;
+  summary?: Summary | null;
 }
 
 export const documentsApi = {
