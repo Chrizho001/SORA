@@ -22,7 +22,7 @@ import {
   BookOpen,
   Info,
 } from "lucide-react";
-import { Deck, Flashcard } from "@/lib/dashboard-api";
+import { Deck, DocumentItem, Flashcard } from "@/lib/dashboard-api";
 import {
   qk,
   useDocument,
@@ -218,6 +218,15 @@ export function DeckDetailView({
         deckId: deck.id,
         count: generateCount,
       });
+      // The API accepted the job (202). Mark the cached source document as GENERATING so
+      // useDocument polls until the job ends and the GENERATING -> DONE effect above reloads
+      // the cards, even if the worker finished before the first poll.
+      if (deck.document) {
+        queryClient.setQueryData<DocumentItem>(
+          qk(user?.id, "document", deck.document),
+          (doc) => (doc ? { ...doc, flashcard_generation_status: "GENERATING" } : doc)
+        );
+      }
       setIsGenerateOpen(false);
     } catch (err: unknown) {
       requestedCountRef.current = null;
