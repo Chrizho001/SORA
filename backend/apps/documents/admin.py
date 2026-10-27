@@ -41,6 +41,7 @@ class DocumentAdmin(ModelAdmin):
     list_filter_submit = True
     search_fields = ("original_name", "user__email")
     readonly_fields = (
+        "id",
         "user",
         "file",
         "original_name",
@@ -56,7 +57,7 @@ class DocumentAdmin(ModelAdmin):
         "updated_at",
     )
     fieldsets = (
-        (None, {"fields": ("original_name", "user", "status", "error_message")}),
+        (None, {"fields": ("id", "original_name", "user", "status", "error_message")}),
         (_("File"), {"classes": ["tab"], "fields": ("file", "size", "page_count")}),
         (
             _("Pipeline"),
@@ -92,7 +93,7 @@ class SummaryAdmin(ModelAdmin):
     list_display = ("document", "ai_model_used", "created_at")
     list_select_related = ("document",)
     search_fields = ("document__original_name", "document__user__email")
-    readonly_fields = ("document", "ai_model_used", "content", "created_at")
+    readonly_fields = ("id", "document", "ai_model_used", "content", "created_at")
 
     def has_add_permission(self, request):
         return False

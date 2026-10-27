@@ -17,6 +17,7 @@ class TaskAdmin(ModelAdmin):
     search_fields = ("title", "description", "user__email")
     raw_id_fields = ("user",)
     readonly_fields = (
+        "id",
         "completed_at",
         "reminder_sent_at",
         "overdue_notified_at",
@@ -24,7 +25,20 @@ class TaskAdmin(ModelAdmin):
         "updated_at",
     )
     fieldsets = (
-        (None, {"fields": ("user", "title", "description", "due_at", "priority", "is_completed")}),
+        (
+            None,
+            {
+                "fields": (
+                    "id",
+                    "user",
+                    "title",
+                    "description",
+                    "due_at",
+                    "priority",
+                    "is_completed",
+                )
+            },
+        ),
         (
             _("Reminders"),
             {

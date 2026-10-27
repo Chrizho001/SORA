@@ -32,6 +32,7 @@ class QuizSessionAdmin(ModelAdmin):
     list_filter = ("created_at", "finished_at")
     search_fields = ("deck_title", "user__email")
     readonly_fields = (
+        "id",
         "user",
         "deck",
         "deck_title",
@@ -66,3 +67,28 @@ class QuizSessionAdmin(ModelAdmin):
         if ratio >= 0.8:
             return _("Excellent")
         return _("Passed") if ratio >= 0.5 else _("Needs work")
+
+
+@admin.register(QuizQuestion)
+class QuizQuestionAdmin(ModelAdmin):
+    """Every field of a quiz question, read-only: questions are created and graded by the API."""
+
+    list_display = ("question_text", "session", "position", "is_correct")
+    list_select_related = ("session",)
+    list_filter = ("is_correct",)
+    search_fields = ("question_text", "correct_answer", "session__user__email")
+    fields = (
+        "id",
+        "session",
+        "flashcard",
+        "position",
+        "question_text",
+        "correct_answer",
+        "choices",
+        "selected_choice",
+        "is_correct",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, request):
+        return False

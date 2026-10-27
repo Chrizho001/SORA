@@ -13,7 +13,7 @@ class NotificationAdmin(ModelAdmin):
     list_filter = ("type", "created_at")
     search_fields = ("title", "body", "recipient__email")
     raw_id_fields = ("recipient",)
-    readonly_fields = ("created_at", "read_at")
+    readonly_fields = ("id", "created_at", "read_at")
 
     @display(description=_("Type"), label=True, ordering="type")
     def display_type(self, obj):
@@ -30,24 +30,45 @@ class NotificationAdmin(ModelAdmin):
 
 @admin.register(PushSubscription)
 class PushSubscriptionAdmin(ModelAdmin):
-    """Endpoint keys are credentials for sending pushes, so they are never shown."""
+    """Every field is listed; endpoint and keys are credentials for sending pushes, so only their
+    first characters are shown."""
 
     list_display = ("user", "display_device", "display_state", "last_used_at", "created_at")
     list_select_related = ("user",)
     list_filter = ("revoked_at", "created_at")
     search_fields = ("user__email", "user_agent")
-    exclude = ("p256dh", "auth", "endpoint")
-    readonly_fields = (
+    fields = (
+        "id",
         "user",
+        "masked_endpoint",
+        "masked_p256dh",
+        "masked_auth",
         "user_agent",
         "created_at",
         "updated_at",
         "last_used_at",
         "revoked_at",
     )
+    readonly_fields = fields
 
     def has_add_permission(self, request):
         return False
+
+    @staticmethod
+    def _mask(value, keep):
+        return f"{value[:keep]}…" if value else "—"
+
+    @display(description="endpoint")
+    def masked_endpoint(self, obj):
+        return self._mask(obj.endpoint, 30)
+
+    @display(description="p256dh")
+    def masked_p256dh(self, obj):
+        return self._mask(obj.p256dh, 7)
+
+    @display(description="auth")
+    def masked_auth(self, obj):
+        return self._mask(obj.auth, 7)
 
     @display(description=_("Device"))
     def display_device(self, obj):
@@ -69,3 +90,4 @@ class NotificationPreferenceAdmin(ModelAdmin):
     list_filter = ("notification_type", "in_app_enabled", "push_enabled", "email_enabled")
     search_fields = ("user__email",)
     raw_id_fields = ("user",)
+    readonly_fields = ("id", "updated_at")

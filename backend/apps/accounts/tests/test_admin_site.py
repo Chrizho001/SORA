@@ -183,3 +183,82 @@ def _request(client):
     request = RequestFactory().get("/")
     request.user = User.objects.get(email="admin@example.com")
     return request
+
+
+class TestDataDictionaryFieldsInAdmin:
+    """Supervisor requirement: every field in the data dictionary is visible on the admin page."""
+
+    # Credentials of a browser push subscription are shown masked, under their own label.
+    MASKED = {"endpoint": "masked_endpoint", "p256dh": "masked_p256dh", "auth": "masked_auth"}
+
+    @pytest.fixture
+    def every_model(self, study_data):
+        from apps.accounts.models import SocialAccount
+        from apps.notifications.models import NotificationPreference, PushSubscription
+
+        student = study_data["student"]
+        SocialAccount.objects.create(
+            user=student, provider="google", provider_uid="g-123", email=student.email
+        )
+        PushSubscription.objects.create(
+            user=student,
+            endpoint="https://push.example.com/send/abcdefghijklmnopqrstuvwxyz",
+            p256dh="BPUBLICKEYSECRET0123456789",
+            auth="AUTHSECRET0123456789",
+        )
+        NotificationPreference.objects.create(
+            user=student, notification_type=NotificationType.QUIZ_GRADED
+        )
+
+    def _shown_fields(self, model_admin, request, obj):
+        shown = set()
+        for _name, opts in model_admin.get_fieldsets(request, obj):
+            for field in opts["fields"]:
+                shown.update(field if isinstance(field, (list, tuple)) else [field])
+        return shown
+
+    def test_every_field_of_every_data_dictionary_model_is_shown(self, admin_client, every_model):
+        from apps.accounts.models import SocialAccount
+        from apps.notifications.models import NotificationPreference, PushSubscription
+
+        models = [
+            User,
+            SocialAccount,
+            Task,
+            Document,
+            Summary,
+            Deck,
+            Flashcard,
+            QuizSession,
+            QuizQuestion,
+            Notification,
+            NotificationPreference,
+            PushSubscription,
+        ]
+        request = _request(admin_client)
+        for model in models:
+            assert model in admin.site._registry, f"{model.__name__} is not in the admin"
+            model_admin = admin.site._registry[model]
+            obj = model.objects.first()
+            shown = self._shown_fields(model_admin, request, obj)
+            missing = [
+                f.name
+                for f in model._meta.concrete_fields
+                if f.name not in shown and self.MASKED.get(f.name) not in shown
+            ]
+            assert not missing, f"{model.__name__} admin hides {missing}"
+
+    def test_change_page_shows_ids_and_masks_push_secrets(self, admin_client, every_model):
+        from apps.notifications.models import PushSubscription
+
+        sub = PushSubscription.objects.get()
+        url = reverse("admin:notifications_pushsubscription_change", args=[sub.pk])
+        html = admin_client.get(url).content.decode()
+        assert str(sub.pk) in html
+        assert "AUTHSECRET0123456789" not in html
+        assert "BPUBLICKEYSECRET0123456789" not in html
+        assert "AUTHSEC…" in html
+
+        question = QuizQuestion.objects.first()
+        url = reverse("admin:quizzes_quizquestion_change", args=[question.pk])
+        assert admin_client.get(url).status_code == 200

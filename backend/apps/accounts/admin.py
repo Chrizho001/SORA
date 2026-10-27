@@ -63,12 +63,12 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     list_filter_submit = True
     search_fields = ("email", "first_name", "last_name")
     ordering = ("-date_joined",)
-    readonly_fields = ("last_login", "date_joined")
+    readonly_fields = ("id", "last_login", "date_joined", "updated_at")
     list_fullwidth = True
 
     # Override fieldsets since we don't have a username field
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
+        (None, {"fields": ("id", "email", "password")}),
         (_("Personal info"), {"fields": ("first_name", "last_name")}),
         (
             _("Permissions"),
@@ -84,7 +84,10 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                 ),
             },
         ),
-        (_("Important dates"), {"classes": ["tab"], "fields": ("last_login", "date_joined")}),
+        (
+            _("Important dates"),
+            {"classes": ["tab"], "fields": ("last_login", "date_joined", "updated_at")},
+        ),
     )
     add_fieldsets = (
         (
@@ -135,7 +138,7 @@ class SocialAccountAdmin(ModelAdmin):
     list_filter = ("provider",)
     search_fields = ("user__email", "provider_uid", "email")
     raw_id_fields = ("user",)
-    readonly_fields = ("created_at",)
+    readonly_fields = ("id", "created_at")
 
     @display(description=_("Provider"), label=True, ordering="provider")
     def display_provider(self, obj):

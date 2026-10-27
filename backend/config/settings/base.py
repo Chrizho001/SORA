@@ -451,6 +451,7 @@ UNFOLD = {
                     _nav("Decks", "style", "flashcards.deck"),
                     _nav("Flashcards", "layers", "flashcards.flashcard"),
                     _nav("Quiz sessions", "quiz", "quizzes.quizsession"),
+                    _nav("Quiz questions", "help", "quizzes.quizquestion"),
                 ],
             },
             {

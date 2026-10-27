@@ -24,7 +24,7 @@ class DeckAdmin(ModelAdmin):
     search_fields = ("title", "user__email")
     list_filter = ("created_at",)
     raw_id_fields = ("user", "document")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("id", "created_at", "updated_at")
     inlines = (FlashcardInline,)
 
     def get_queryset(self, request):
@@ -42,7 +42,7 @@ class FlashcardAdmin(ModelAdmin):
     list_filter = ("source", "created_at")
     search_fields = ("question", "answer", "deck__title", "user__email")
     raw_id_fields = ("user", "deck", "document")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("id", "created_at", "updated_at")
 
     @display(description=_("Question"), ordering="question")
     def short_question(self, obj):
